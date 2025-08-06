@@ -1,0 +1,50 @@
+//Trie
+template<ll char_size,ll base>
+struct Trie{
+    struct Node {
+        array<ll, char_size> next;
+        bool is_end;
+        Node() : is_end(false) {
+            next.fill(-1);
+        }
+    };
+
+    vector<Node> nodes;
+
+    Trie() {
+        nodes.emplace_back();
+    }
+
+    void insert(const string &s) {
+        ll v = 0;
+        for (char ch : s) {
+            ll c = ch - base;
+            if (nodes[v].next[c] == -1) {
+                nodes[v].next[c] = nodes.size();
+                nodes.emplace_back();
+            }
+            v = nodes[v].next[c];
+        }
+        nodes[v].is_end = true;
+    }
+
+    bool search(const string &s) const {
+        ll v = 0;
+        for (char ch : s) {
+            ll c = ch - base;
+            if (nodes[v].next[c] == -1) return false;
+            v = nodes[v].next[c];
+        }
+        return nodes[v].is_end;
+    }
+
+    bool starts_with(const string &s) const {
+        ll v = 0;
+        for (char ch : s) {
+            ll c = ch - base;
+            if (nodes[v].next[c] == -1) return false;
+            v = nodes[v].next[c];
+        }
+        return true;
+    }
+};

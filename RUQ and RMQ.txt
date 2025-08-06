@@ -1,0 +1,53 @@
+// RUQ and RMQ
+// range_update(l,r,x) a[l],a[l+1]...a[r-1]をxに更新
+// get_min(l,r) a[l],a[l+1]...a[r-1]の最小値を取得
+struct SegTree {
+    ll len;
+    vector<ll> data, lazy;
+    vector<bool> lazy_flag;
+
+    SegTree(ll sz) {
+        len = 1;
+        while (len < sz) len <<= 1;
+        data.assign(2 * len, LLONG_MAX);// 初期値 2^63-1
+        lazy.assign(2 * len, 0);
+        lazy_flag.assign(2 * len, false);
+    }
+
+    void eval(ll k, ll sl, ll sr) {
+        if (lazy_flag[k]) {
+            data[k] = lazy[k];
+            if (sr - sl > 1) {
+                lazy[2 * k] = lazy[k];
+                lazy[2 * k + 1] = lazy[k];
+                lazy_flag[2 * k] = lazy_flag[2 * k + 1] = true;
+            }
+            lazy_flag[k] = false;
+        }
+    }
+
+    void range_update(ll l, ll r, ll x, ll sl = 0, ll sr = -1, ll k = 1) {
+        if (sr == -1) sr = len;
+        eval(k, sl, sr);
+        if (r <= sl || sr <= l) return;
+        if (l <= sl && sr <= r) {
+            lazy[k] = x;
+            lazy_flag[k] = true;
+            eval(k, sl, sr);
+        } else {
+            ll sm = (sl + sr) / 2;
+            range_update(l, r, x, sl, sm, 2 * k);
+            range_update(l, r, x, sm, sr, 2 * k + 1);
+            data[k] = min(data[2 * k], data[2 * k + 1]);//get_maxならmax
+        }
+    }
+
+    ll get_min(ll l, ll r, ll sl = 0, ll sr = -1, ll k = 1) {
+        if (sr == -1) sr = len;
+        eval(k, sl, sr);
+        if (r <= sl || sr <= l) return LLONG_MAX;//get_maxなら0 or -inf
+        if (l <= sl && sr <= r) return data[k];
+        ll sm = (sl + sr) / 2;
+        return min(get_min(l, r, sl, sm, 2 * k), get_min(l, r, sm, sr, 2 * k + 1));//get_maxならmax
+    }
+};

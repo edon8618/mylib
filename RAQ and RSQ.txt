@@ -1,0 +1,49 @@
+//RAQ and RSQ
+//range_add(l,r,x) a[l],a[l+1]...a[r-1]にxを加算
+//get_sum(l,r) a[l],a[l+1]...a[r-1]の和を取得
+struct SegTree {
+    ll len;
+    vector<ll> data, lazy;
+
+    SegTree(ll sz) {
+        len = 1;
+        while (len < sz) len <<= 1;
+        data.assign(2 * len, 0);
+        lazy.assign(2 * len, 0);
+    }
+
+    void eval(ll k, ll sl, ll sr) {
+        if (lazy[k] != 0) {
+            data[k] += lazy[k] * (sr - sl);
+            if (sr - sl > 1) {
+                lazy[2 * k] += lazy[k];
+                lazy[2 * k + 1] += lazy[k];
+            }
+            lazy[k] = 0;
+        }
+    }
+
+    void range_add(ll l, ll r, ll x, ll sl = 0, ll sr = -1, ll k = 1) {
+        if(sr == -1) sr = len;
+        eval(k, sl, sr);
+        if (r <= sl || sr <= l) return;
+        if (l <= sl && sr <= r) {
+            lazy[k] += x;
+            eval(k, sl, sr);
+        } else {
+            ll sm = (sl + sr) / 2;
+            range_add(l, r, x, sl, sm, 2 * k);
+            range_add(l, r, x, sm, sr, 2 * k + 1);
+            data[k] = data[2 * k] + data[2 * k + 1];
+        }
+    }
+
+    ll get_sum(ll l, ll r, ll sl = 0, ll sr = -1, ll k = 1) {
+        if(sr == -1) sr = len;
+        eval(k, sl, sr);
+        if (r <= sl || sr <= l) return 0;
+        if (l <= sl && sr <= r) return data[k];
+        ll sm = (sl + sr) / 2;
+        return get_sum(l, r, sl, sm, 2 * k) + get_sum(l, r, sm, sr, 2 * k + 1);
+    }
+};
