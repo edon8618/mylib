@@ -1,0 +1,49 @@
+struct LCA{
+    vector<vector<ll>> G;//隣接リスト
+    vector<vector<ll>> parent;
+    vector<ll> depth;
+    ll LOG;
+    LCA(const vector<vector<ll>>& g, ll root = 0) {
+        G = g;
+        ll n = G.size();
+        LOG = 1;
+        while ((1LL << LOG) <= n) LOG++;
+        parent.assign(LOG, vector<ll>(n, -1));
+        depth.assign(n, 0);
+        dfs(root, -1, 0);
+        for (ll k = 0; k + 1 < LOG; k++) {
+            for (ll v = 0; v < n; v++) {
+                if (parent[k][v] < 0) parent[k + 1][v] = -1;
+                else parent[k + 1][v] = parent[k][parent[k][v]];
+            }
+        }
+    }
+    void dfs(ll v, ll p, ll d) {//ダブリング
+        parent[0][v] = p;
+        depth[v] = d;
+        for (ll u : G[v]) {
+            if (u == p) continue;
+            dfs(u, v, d + 1);
+        }
+    }
+    ll query(ll u, ll v) {
+        if (depth[u] < depth[v]) swap(u, v);
+        for (ll k = LOG - 1; k >= 0; k--) {//LA
+            if (parent[k][u] != -1 && depth[parent[k][u]] >= depth[v]) {
+                u = parent[k][u];
+            }
+        }
+        if (u == v) return u;
+        for (ll k = LOG - 1; k >= 0; k--) {//LCA
+            if (parent[k][u] != -1 && parent[k][u] != parent[k][v]) {
+                u = parent[k][u];
+                v = parent[k][v];
+            }
+        }
+        return parent[0][u];
+    }
+    ll dist(ll u, ll v) {
+        ll lca = query(u, v);
+        return depth[u] + depth[v] - 2 * depth[lca];
+    }
+};
