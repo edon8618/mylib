@@ -1,0 +1,33 @@
+//matrix +pow
+struct matrix{
+    ll sz;
+    vector<vector<mint>> mtr;
+    matrix(ll n){
+        sz=n;
+        mtr=vector<vector<mint>> (n,vector<mint> (n,0));
+    }
+    matrix(vector<vector<mint>> v){
+        sz=v.size();
+        mtr=v;
+    }
+};
+
+matrix mtrprod(matrix a,matrix b){
+    ll n=a.sz;
+    matrix ret(n);
+    rep(i,n){
+        rep(k,n){
+            rep(j,n){
+                ret.mtr[i][j]+=a.mtr[i][k]*b.mtr[k][j];
+            }
+        }
+    }
+    return ret;
+}
+
+matrix mtrpow(matrix a, ll r) {
+    if (r == 1) return a;
+    matrix t = mtrpow(mtrprod(a, a), r / 2);
+    if (r % 2 == 1) return mtrprod(a, t);
+    else return t;
+}
