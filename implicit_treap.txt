@@ -1,0 +1,226 @@
+// https://judge.yosupo.jp/submission/326817
+template<
+    typename S, typename F,
+    S (*op)(S, S),
+    S (*e)(),
+    S (*mapping)(F, S),
+    F (*composition)(F, F),
+    F (*id)(),
+    S (*rev_op)(S)
+>
+struct implicit_treap {
+    struct Node {
+        S val;   // single element value
+        S sum;   // aggregated value of subtree (順序依存)
+        int sz;
+        unsigned pri;
+        Node *l, *r;
+        F lazy;
+        bool has_lazy;
+        bool rev; // reverse flag
+        Node(const S &v, unsigned p): val(v), sum(v), sz(1), pri(p), l(nullptr), r(nullptr), lazy(id()), has_lazy(false), rev(false) {}
+        void pull(){
+            // subtree の集合を左->val->右 の順で計算
+            sum = val;
+            sz = 1;
+            if(l){ sum = op(l->sum, sum); sz += l->sz; }
+            if(r){ sum = op(sum, r->sum); sz += r->sz; }
+        }
+        void apply_lazy(const F &f){
+            // 写像 f を val と sum に適用
+            val = mapping(f, val);
+            sum = mapping(f, sum);
+            if(has_lazy){
+                // 新しい f を既存 lazy の前に適用する（apply f after existing lazy）
+                lazy = composition(f, lazy);
+            }else{
+                lazy = f;
+                has_lazy = true;
+            }
+        }
+        void apply_rev(){
+            // 節点を反転：子をswapし、val/sum を rev_op で反転表現に変える
+            rev = !rev;
+            std::swap(l, r);
+            val = rev_op(val);
+            sum = rev_op(sum);
+        }
+        void push(){
+            // 子へ遅延写像を伝搬
+            if(has_lazy){
+                if(l) l->apply_lazy(lazy);
+                if(r) r->apply_lazy(lazy);
+                lazy = id();
+                has_lazy = false;
+            }
+            // 子へ反転フラグを伝搬（apply_rev は子の構造も入れ替える）
+            if(rev){
+                if(l) l->apply_rev();
+                if(r) r->apply_rev();
+                rev = false;
+            }
+        }
+    };
+
+    Node *root;
+    std::mt19937_64 rng;
+
+    implicit_treap(): root(nullptr), rng((unsigned)chrono::high_resolution_clock::now().time_since_epoch().count()) {}
+
+    ~implicit_treap(){
+        destroy(root);
+    }
+
+    void destroy(Node *t){
+        if(!t) return;
+        destroy(t->l);
+        destroy(t->r);
+        delete t;
+    }
+
+    int size() const { return root ? root->sz : 0; }
+
+    Node* make_node(const S &v){
+        return new Node(v, (unsigned)(rng() >> 1));
+    }
+
+    // split by first k elements: [0,k) and [k, n)
+    pair<Node*, Node*> split(Node *t, int k){
+        if(!t) return {nullptr, nullptr};
+        t->push();
+        int lsz = t->l ? t->l->sz : 0;
+        if(k <= lsz){
+            auto pr = split(t->l, k);
+            t->l = pr.second;
+            t->pull();
+            return {pr.first, t};
+        }else{
+            auto pr = split(t->r, k - lsz - 1);
+            t->r = pr.first;
+            t->pull();
+            return {t, pr.second};
+        }
+    }
+
+    Node* merge(Node *a, Node *b){
+        if(!a) return b;
+        if(!b) return a;
+        if(a->pri > b->pri){
+            a->push();
+            a->r = merge(a->r, b);
+            a->pull();
+            return a;
+        }else{
+            b->push();
+            b->l = merge(a, b->l);
+            b->pull();
+            return b;
+        }
+    }
+
+    // build from vector of S
+    Node* build_from_vector(const vector<S> &v){
+        Node *t = nullptr;
+        for(const S &x : v){
+            t = merge(t, make_node(x));
+        }
+        return t;
+    }
+
+    void build(const vector<S> &v){
+        destroy(root);
+        root = build_from_vector(v);
+    }
+
+    // get element at index i (0-index)
+    S get(int i){
+        Node *t = root;
+        while(t){
+            t->push();
+            int lsz = t->l ? t->l->sz : 0;
+            if(i < lsz) t = t->l;
+            else if(i == lsz) return t->val;
+            else { i -= lsz + 1; t = t->r; }
+        }
+        return e(); // out of range -> return identity
+    }
+
+    // insert element at position pos (0-index, insert before pos)
+    void insert(int pos, const S &v){
+        assert(0<=pos && pos<=(this->size()));
+        auto pr = split(root, pos);
+        Node *n = make_node(v);
+        root = merge(merge(pr.first, n), pr.second);
+    }
+
+    // erase element at position pos
+    void erase(int pos){
+        assert(0<=pos && pos<=(this->size()));
+        auto a = split(root, pos);
+        auto b = split(a.second, 1); // b.first is node to erase
+        destroy(b.first);
+        root = merge(a.first, b.second);
+    }
+
+    // apply mapping f to range [l, r) (0-index half-open)
+    void apply(int l, int r, const F &f){
+        assert(0<=l && r<=(this->size()) && l<=r);
+        if(l >= r) return;
+        auto a = split(root, l);
+        auto b = split(a.second, r - l);
+        if(b.first) b.first->apply_lazy(f);
+        root = merge(a.first, merge(b.first, b.second));
+    }
+
+    // reverse range [l,r) (0-index half-open)
+    void range_reverse(int l, int r){
+        assert(0<=l && r<=(this->size()) && l<=r);
+        if(l >= r) return;
+        auto a = split(root, l);
+        auto b = split(a.second, r - l);
+        if(b.first) b.first->apply_rev();
+        root = merge(a.first, merge(b.first, b.second));
+    }
+
+    // query aggregate on [l, r)
+    S prod(int l, int r){
+        assert(0<=l && r<=(this->size()) && l<=r);
+        if(l >= r) return e();
+        auto a = split(root, l);
+        auto b = split(a.second, r - l);
+        S res = b.first ? b.first->sum : e();
+        root = merge(a.first, merge(b.first, b.second));
+        return res;
+    }
+
+    // inorder -> vector
+    void to_vector(Node *t, vector<S> &out){
+        if(!t) return;
+        t->push();
+        to_vector(t->l, out);
+        out.push_back(t->val);
+        to_vector(t->r, out);
+    }
+    vector<S> to_vector(){
+        vector<S> v;
+        v.reserve(size());
+        to_vector(root, v);
+        return v;
+    }
+};
+
+struct S{};
+
+struct F{};
+
+S op(S l,S r){}
+
+S e(){}
+
+S mapping(F f,S s){}
+
+F id(){}
+
+F composition(F f,F g){}
+
+S rev_op(S s){}
