@@ -1,4 +1,4 @@
-// https://atcoder.jp/contests/arc033/submissions/70722276
+// https://atcoder.jp/contests/arc033/submissions/70741940
 // シンプルなテンプレート AVL 木（multiset 互換の最小実装）
 // - T: キーの型
 // - Comp: 比較関数（デフォルト less<T>）
@@ -175,35 +175,6 @@ struct AVLtree {
         return hi - lo;
     }
 
-    // lower_bound: smallest key >= given key
-    optional<T> lower_bound(const T& key) const {
-        Node* cur = root;
-        Node* ans = nullptr;
-        while(cur){
-            if(!comp(cur->key, key)){ // cur->key >= key
-                ans = cur;
-                cur = cur->l;
-            }else cur = cur->r;
-        }
-        if(ans) return ans->key;
-        return nullopt;
-    }
-    // upper_bound: smallest key > given key
-    optional<T> upper_bound(const T& key) const {
-        Node* cur = root;
-        Node* ans = nullptr;
-        while(cur){
-            if(comp(key, cur->key)){ // key < cur->key  => cur->key > key
-                ans = cur;
-                cur = cur->l;
-            } else {
-                cur = cur->r;
-            }
-        }
-        if(ans) return ans->key;
-        return nullopt;
-    }
-
     // k-th (0-indexed). return optional
     optional<T> at(int k) const {
         if(k < 0 || k >= size()) return nullopt;
@@ -234,6 +205,59 @@ struct AVLtree {
             }
         }
         return r;
+    }
+
+    // --- iterator-like interface (index-based iterator) ---
+    struct Iterator {
+        const AVLtree* tree = nullptr;
+        int idx = 0; // 0..size()
+        Iterator() = default;
+        Iterator(const AVLtree* t, int i): tree(t), idx(i) {}
+        T operator*() const {
+            auto o = tree->at(idx);
+            return *o; // assume valid
+        }
+        Iterator& operator++(){ ++idx; return *this; } // prefix
+        Iterator& operator--(){ --idx; return *this; } // prefix
+        Iterator& operator+=(int k){ idx += k; return *this; }
+        Iterator& operator-=(int k){ idx -= k; return *this; }
+        Iterator operator+(int k) const { return Iterator(tree, idx + k); }
+        Iterator operator-(int k) const { return Iterator(tree, idx - k); }
+        int index() const { return idx; }
+        bool valid() const { return tree && idx >= 0 && idx < tree->size(); }
+    };
+
+    // lower_bound: returns iterator to first element >= key (index)
+    Iterator lower_bound(const T& key) const {
+        int idx = 0;
+        Node* cur = root;
+        int ans = size();
+        while(cur){
+            if(!comp(cur->key, key)){ // cur->key >= key
+                ans = idx + sz(cur->l);
+                cur = cur->l;
+            }else{
+                idx += 1 + sz(cur->l);
+                cur = cur->r;
+            }
+        }
+        return Iterator(this, ans);
+    }
+    // upper_bound: returns iterator to first element > key (index)
+    Iterator upper_bound(const T& key) const {
+        int idx = 0;
+        Node* cur = root;
+        int ans = size();
+        while(cur){
+            if(comp(key, cur->key)){ // key < cur->key
+                ans = idx + sz(cur->l);
+                cur = cur->l;
+            } else {
+                idx += 1 + sz(cur->l);
+                cur = cur->r;
+            }
+        }
+        return Iterator(this, ans);
     }
 
     // inorder to vector
