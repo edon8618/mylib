@@ -1,0 +1,46 @@
+// Bostan-Mori: P(x)/Q(x) の n 次の係数を求める (Q(0) != 0 であること)
+mint bostan_mori(vector<mint> P, vector<mint> Q, long long n) {
+    // P の次数を Q の次数より小さくするまで除算
+    // 簡略化のため P.size() <= Q.size() - 1 と仮定
+    
+    while (n > 0) {
+        // Q(-x) を計算：奇数次の項を反転
+        vector<mint> Q_neg = Q;
+        for (size_t i = 1; i < Q_neg.size(); i += 2) {
+            Q_neg[i] = -Q_neg[i];
+        }
+        
+        // P(x) * Q(-x) を計算
+        auto PQ_neg = convolution(P, Q_neg);
+        
+        // Q(x) * Q(-x) を計算
+        auto Q2 = convolution(Q, Q_neg);
+        
+        // Q2 は偶関数なので常に偶数次の項のみ
+        vector<mint> P_new, Q_new;
+        
+        if (n & 1) {
+            // n が奇数：奇数次の項を抽出
+            for (size_t i = 1; i < PQ_neg.size(); i += 2) {
+                P_new.push_back(PQ_neg[i]);
+            }
+        } else {
+            // n が偶数：偶数次の項を抽出
+            for (size_t i = 0; i < PQ_neg.size(); i += 2) {
+                P_new.push_back(PQ_neg[i]);
+            }
+        }
+        // Q2 は常に偶数次の項だけ取り出す
+        for (size_t i = 0; i < Q2.size(); i += 2) {
+            Q_new.push_back(Q2[i]);
+        }
+        
+        P = P_new;
+        Q = Q_new;
+        n /= 2;
+    }
+    
+    assert(Q[0]!=0);
+    // n == 0 の場合は 0 次の係数、つまり P[0] / Q[0]
+    return P[0] / Q[0];
+}
