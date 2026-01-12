@@ -1,0 +1,94 @@
+/*https://judge.yosupo.jp/submission/345247
+オイラーツアー + Sparse Table
+
+前計算 O(N log N)
+query(u,v) 　　　　　O(1) 　　　u　と　v　のLCAを求める
+is_ancestor(p,s) 　　O(1) 　　　p　が　s　の祖先である？
+kth_ancestor(v,k) 　O(log k) 　v　の　k　個上の親、特に kth_ancestor(v,1) は　v　の親
+*/
+struct LCA {
+    vector<int> first_occur;
+    vector<int> euler_tour;
+    vector<int> depth;
+    vector<vector<int>> st; // Sparse Table
+    vector<int> log_table;
+    vector<vector<int>> parent; // for kth_ancestor
+    int LOG;
+
+    LCA(const vector<vector<ll>> &adj, int root = 0) {
+        int n = adj.size();
+        depth.resize(n);
+        first_occur.resize(n);
+        
+        // ダブリング用の親テーブル初期化
+        LOG = 1;
+        while ((1 << LOG) <= n) LOG++;
+        parent.assign(LOG, vector<int>(n, -1));
+        
+        dfs(adj, root, -1, 0);
+        
+        // ダブリングテーブル構築
+        for (int k = 0; k + 1 < LOG; k++) {
+            for (int v = 0; v < n; v++) {
+                if (parent[k][v] < 0) parent[k + 1][v] = -1;
+                else parent[k + 1][v] = parent[k][parent[k][v]];
+            }
+        }
+
+        int m = euler_tour.size();
+        log_table.resize(m + 1);
+        log_table[1] = 0;
+        for (int i = 2; i <= m; i++) log_table[i] = log_table[i >> 1] + 1;
+
+        int K = log_table[m] + 1;
+        st.assign(K, vector<int>(m));
+        for (int i = 0; i < m; i++) st[0][i] = euler_tour[i];
+
+        for (int k = 1; k < K; k++) {
+            for (int i = 0; i + (1 << k) <= m; i++) {
+                int u = st[k - 1][i];
+                int v = st[k - 1][i + (1 << (k - 1))];
+                st[k][i] = (depth[u] < depth[v] ? u : v);
+            }
+        }
+    }
+
+    void dfs(const vector<vector<ll>> &adj, int u, int p, int d) {
+        depth[u] = d;
+        parent[0][u] = p;
+        first_occur[u] = euler_tour.size();
+        euler_tour.push_back(u);
+        for (auto v : adj[u]) {
+            if (v != p) {
+                dfs(adj, v, u, d + 1);
+                euler_tour.push_back(u);
+            }
+        }
+    }
+
+    int query(int u, int v) {
+        int left = first_occur[u];
+        int right = first_occur[v];
+        if (left > right) swap(left, right);
+        int k = log_table[right - left + 1];
+        int lca1 = st[k][left];
+        int lca2 = st[k][right - (1 << k) + 1];
+        return depth[lca1] < depth[lca2] ? lca1 : lca2;
+    }
+
+    int dist(int u, int v) {
+        return depth[u] + depth[v] - 2 * depth[query(u, v)];
+    }
+    
+    int kth_ancestor(int v, int k) { // v の k 個上の親
+        for (int i = 0; i < LOG; i++) {
+            if ((k >> i) & 1) v = parent[i][v];
+            if (v == -1) return -1;
+        }
+        return v;
+    }
+    
+    bool is_ancestor(int p, int s) { // p が s の祖先か?
+        return query(p, s) == p;
+    }
+};

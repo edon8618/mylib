@@ -1,0 +1,119 @@
+// poly_inv  https://judge.yosupo.jp/submission/329040
+// poly_log  https://judge.yosupo.jp/submission/329039
+// poly_exp  https://judge.yosupo.jp/submission/329041
+// poly_pow  https://judge.yosupo.jp/submission/329043
+// convolution helper
+vector<mint> conv(const vector<mint>& a, const vector<mint>& b){
+    return atcoder::convolution(a, b);
+}
+vector<mint> mul(const vector<mint>& a, const vector<mint>& b, int m){
+    auto c = conv(a, b);
+    if((int)c.size() > m) c.resize(m);
+    return c;
+}
+
+// derivative / integral
+vector<mint> poly_derivative(const vector<mint>& a){
+    if(a.size() <= 1) return {};
+    vector<mint> d(a.size() - 1);
+    for(size_t i = 0; i + 1 < a.size(); ++i) d[i] = a[i+1] * mint((long long)(i+1));
+    return d;
+}
+vector<mint> poly_integral(const vector<mint>& a, int m){
+    vector<mint> res(m);
+    for(size_t i = 0; i < a.size() && i + 1 < (size_t)m; ++i){
+        res[i+1] = a[i] / mint((long long)(i+1));
+    }
+    return res;
+}
+
+// inverse and logarithm of FPS
+vector<mint> poly_inv(const vector<mint>& a, int m){
+    vector<mint> b(1);
+    b[0] = mint(1) / a[0];
+    int k = 1;
+    while(k < m){
+        k <<= 1;
+        vector<mint> a_k(min((int)a.size(), k));
+        for(int i = 0; i < (int)a_k.size(); ++i) a_k[i] = a[i];
+        auto ab = mul(a_k, b, k);
+        vector<mint> t(k);
+        for(int i = 0; i < k; ++i){
+            mint val = i < (int)ab.size() ? ab[i] : mint(0);
+            t[i] = -val;
+        }
+        t[0] += mint(2);
+        b = mul(b, t, k);
+    }
+    b.resize(m);
+    return b;
+}
+
+vector<mint> poly_log(const vector<mint>& a, int m){
+    auto inva = poly_inv(a, m);
+    auto der = poly_derivative(a);
+    auto q = mul(der, inva, max(0, m-1));
+    return poly_integral(q, m);
+}
+
+vector<mint> poly_exp(vector<mint> v, int n){
+    if(n == 0) return {};
+    if(n == 1) return vector<mint>{mint(1)};
+    if(v[0] != mint(0)) return {}; // expects constant term = 0
+
+    vector<mint> g(1, mint(1));
+    int k = 1;
+    while(k < n){
+        k <<= 1;
+        int m = min(k, n);
+        auto logg = poly_log(g, m);
+        vector<mint> diff(m);
+        for(int i = 0; i < m; ++i){
+            mint wi = i < (int)v.size() ? v[i] : mint(0);
+            mint li = i < (int)logg.size() ? logg[i] : mint(0);
+            diff[i] = wi - li;
+        }
+        diff[0] += mint(1);
+        g = mul(g, diff, m);
+    }
+    g.resize(n);
+    return g;
+}
+
+vector<mint> poly_pow(vector<mint> a,ll r){// ll n=sz　を引数にするように直す
+    assert(r>=0);
+    int n = (int)a.size();
+    if(n == 0) return {};
+    if(r == 0){
+        vector<mint> res(n, mint(0));
+        res[0] = mint(1);
+        return res;
+    }
+    ll shift = 0;
+    while(shift < n && a[shift] == mint(0)) ++shift;
+    if(shift == n) return vector<mint>(n, mint(0));
+
+    if(shift > (n - 1) / r) return vector<mint>(n, mint(0));
+    long long total_shift = shift * r;
+    int m = n - (int)total_shift;
+
+    // b = a shifted by `shift`
+    vector<mint> b(n - shift);
+    for(int i = 0; i < (int)b.size(); ++i) b[i] = a[i + shift];
+
+    // normalize: b = c0 * u, u[0] = 1
+    mint c0 = b[0];
+    for(auto &x : b) x /= c0;
+
+    // compute b^r = exp(r * log(b)) truncated to length m
+    auto lg = poly_log(b, m); // lg[0] == 0
+    for(auto &x : lg) x *= mint(r);
+    auto u_pow = poly_exp(lg,m); // size == m
+    u_pow.resize(m);
+
+    // multiply by c0^r and shift by total_shift
+    mint c0r = c0.pow(r);
+    vector<mint> res(n, mint(0));
+    for(int i = 0; i < m; ++i) res[i + total_shift] = u_pow[i] * c0r;
+    return res;
+}
