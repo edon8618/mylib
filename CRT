@@ -1,0 +1,33 @@
+/**https://atcoder.jp/contests/abc371/submissions/72833170
+ * 中国剰余定理 (2変数版)
+ * extend_gcdも合わせてコピペする
+ * 引数の型はすべて<T>でそろえる
+ * 
+ * O(log( r1+r2+m1+m2 ))
+ * x ≡ r1 (mod m1)
+ * x ≡ r2 (mod m2)
+ * CRT(r1,m1,r2,m2)
+ * 戻り値: pair<T,T> {x = newr, lcm(m1, m2) = newmod}
+ * 解なしの場合は {0, 0}
+ */
+template<typename T>
+T safe_mod(T a, T m) {
+    T res = a % m;
+    if (res < 0) res += m;
+    return res;
+}
+template<typename T>
+pair<T, T> CRT(T r1, T m1, T r2, T m2) {
+    T p, q;
+    T g = extend_gcd(m1, m2, p, q); // p*m1 + q*m2 = g
+    
+    if ((r2 - r1) % g != 0) return {0, 0};
+    
+    T m = (m1 / g) * m2; // lcm
+    
+    // オーバーフローしないように順番に注意して計算
+    T term = safe_mod(T((r2 - r1) / g), T(m2 / g));
+    T x = safe_mod(T(r1 + m1 * ((p * term) % (m2 / g))), m);
+    
+    return {x, m};
+}
