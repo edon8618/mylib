@@ -1,0 +1,176 @@
+/**https://judge.yosupo.jp/submission/346168
+ **https://judge.yosupo.jp/submission/346172
+ **https://atcoder.jp/contests/abc350/submissions/72487255
+ * 
+ * * LinkCutTree
+ * * [概要]
+ * 動的木(森)に対する操作を O(log N) で行うデータ構造。
+ * 行列積や関数合成などの「非可換」な演算に対応しています。
+ * 内部で順方向(prod)と逆方向(rev_prod)の両方を維持するため、
+ * ユーザーが反転操作(rev_op/flip)を定義する必要はありません。
+ *
+ * [テンプレート引数]
+ * S: 値の型
+ * op(a, b): 結合則を満たす演算 (a * b)
+ * e(): 単位元
+ *
+ * [使用上の注意]
+ * - 頂点番号は 0-based (0 ~ N-1) です。
+ * - split(u, v) した直後に get_prod(v) などでパスの結果を取得します。
+ * * * [メンバ関数 (Public API)]
+ * - link(u, v): u-v 間に辺を張る (uを根にしてvに接続)
+ * - cut(u, v): u-v 間の辺を切る
+ * - is_connected(u, v): u と v が同じ木に属するか判定
+ * - find_root(u): u が属する木の根を返す
+ * 
+ * * * [パス操作の流れ]
+ * 1. split(u, v) : u-v パスを抽出して v をSplay木の根にする
+ * 2. 直後に以下の関数で結果を取得する
+ * - get_prod(v) : パス全体の積 (u -> v 順) を取得
+ * - get_sz(v)   : パスの頂点数を取得
+ * - get_kth(v, k) : u から数えて k 番目(0-based)の頂点番号を取得
+ * 
+ * * * [値の更新・取得]
+ * - set(v, x): 頂点 v の値を x に更新
+ * - get(v): 頂点 v の値を取得
+ */
+
+template <class S, S (*op)(S, S), S (*e)()>
+struct LinkCutTree {
+private:
+    struct Node {
+        int l, r, p;
+        S val;
+        S prod;     // 順方向 (u -> v)
+        S rev_prod; // 逆方向 (v -> u)
+        bool rev;   // 反転フラグ
+        int sz;
+    };
+    vector<Node> nodes;
+
+    bool is_root(int t) {
+        int p = nodes[t].p;
+        return p == -1 || (nodes[p].l != t && nodes[p].r != t);
+    }
+
+    void push_up(int t) {
+        if (t == -1) return;
+        nodes[t].sz = 1;
+        
+        // --- 順方向 (prod) の更新: L * Self * R ---
+        nodes[t].prod = nodes[t].val;
+        if (nodes[t].l != -1) {
+            nodes[t].sz += nodes[nodes[t].l].sz;
+            nodes[t].prod = op(nodes[nodes[t].l].prod, nodes[t].prod);
+        }
+        if (nodes[t].r != -1) {
+            nodes[t].sz += nodes[nodes[t].r].sz;
+            nodes[t].prod = op(nodes[t].prod, nodes[nodes[t].r].prod);
+        }
+
+        // --- 逆方向 (rev_prod) の更新: R_rev * Self * L_rev ---
+        // 子ノードの rev_prod は既に「その部分木内での逆順」になっているので、
+        // それらを 右 -> 左 の順で繋げれば全体の逆順になる。
+        nodes[t].rev_prod = nodes[t].val;
+        if (nodes[t].r != -1) {
+            nodes[t].rev_prod = op(nodes[nodes[t].r].rev_prod, nodes[t].rev_prod);
+        }
+        if (nodes[t].l != -1) {
+            nodes[t].rev_prod = op(nodes[t].rev_prod, nodes[nodes[t].l].rev_prod);
+        }
+    }
+
+    void toggle(int t) {
+        if (t == -1) return;
+        swap(nodes[t].l, nodes[t].r);
+        swap(nodes[t].prod, nodes[t].rev_prod);
+        nodes[t].rev ^= true;
+    }
+
+    void push_down(int t) {
+        if (t == -1 || !nodes[t].rev) return;
+        
+        // 子ノードにも toggle を適用（フラグ反転＋値swap）
+        if (nodes[t].l != -1) toggle(nodes[t].l);
+        if (nodes[t].r != -1) toggle(nodes[t].r);
+        
+        nodes[t].rev = false;
+    }
+
+    // ... (rotate, splay, access, make_root などは変更なし) ...
+    void rotate(int t) {
+        int p = nodes[t].p; int pp = nodes[p].p;
+        if (!is_root(p)) { if (nodes[pp].l == p) nodes[pp].l = t; else nodes[pp].r = t; }
+        nodes[t].p = pp;
+        if (nodes[p].l == t) { nodes[p].l = nodes[t].r; if (nodes[t].r != -1) nodes[nodes[t].r].p = p; nodes[t].r = p; }
+        else { nodes[p].r = nodes[t].l; if (nodes[t].l != -1) nodes[nodes[t].l].p = p; nodes[t].l = p; }
+        nodes[p].p = t;
+        push_up(p); push_up(t);
+    }
+    void splay(int t) {
+        vector<int> path; int curr = t;
+        while (!is_root(curr)) { path.push_back(curr); curr = nodes[curr].p; }
+        path.push_back(curr);
+        while (!path.empty()) { push_down(path.back()); path.pop_back(); }
+        while (!is_root(t)) {
+            int p = nodes[t].p;
+            if (is_root(p)) { rotate(t); }
+            else {
+                int pp = nodes[p].p;
+                if ((nodes[pp].l == p) == (nodes[p].l == t)) { rotate(p); rotate(t); }
+                else { rotate(t); rotate(t); }
+            }
+        }
+    }
+    int access(int t) {
+        int last = -1;
+        for (int v = t; v != -1; v = nodes[v].p) {
+            splay(v); nodes[v].r = last; push_up(v); last = v;
+        }
+        splay(t); return last;
+    }
+    void make_root(int t) { access(t); toggle(t); push_down(t); }
+    int get_kth_internal(int t, int k) {
+        push_down(t);
+        int l_size = (nodes[t].l != -1) ? nodes[nodes[t].l].sz : 0;
+        if (k < l_size) return get_kth_internal(nodes[t].l, k);
+        if (k == l_size) { splay(t); return t; }
+        return get_kth_internal(nodes[t].r, k - l_size - 1);
+    }
+
+public:
+    LinkCutTree(int n) : nodes(n) {
+        for (int i = 0; i < n; i++) nodes[i] = {-1, -1, -1, e(), e(), e(), false, 1};
+    }
+
+    void link(int u, int v) {
+        make_root(u);
+        if (find_root(v) == u) return;
+        nodes[u].p = v;
+    }
+
+    void cut(int u, int v) {
+        make_root(u); access(v);
+        if (nodes[v].l != u || nodes[u].r != -1) return;
+        nodes[v].l = -1; nodes[u].p = -1; push_up(v);
+    }
+
+    bool is_connected(int u, int v) { return find_root(u) == find_root(v); }
+
+    int find_root(int v) {
+        access(v);
+        while (nodes[v].l != -1) { push_down(v); v = nodes[v].l; }
+        splay(v); return v;
+    }
+
+    void split(int u, int v) { make_root(u); access(v); }
+
+    void set(int v, S x) { splay(v); nodes[v].val = x; push_up(v); }
+    S get(int v) { splay(v); return nodes[v].val; }
+    
+    // パス全体の積 (u -> v 順)
+    S get_prod(int v) { return nodes[v].prod; }
+    
+    int get_sz(int v) { return nodes[v].sz; }
+    int get_kth(int v, int k) { return get_kth_internal(v, k); }
+};
