@@ -1,0 +1,31 @@
+//https://atcoder.jp/contests/abc213/submissions/73362500
+// t.size()-1 の長さの　最長共通接頭辞長　の配列を返す
+vl LCP_array(string t, vi SA) {
+    ll n = t.size();
+    vl lcp(n - 1, 0);
+    vl rank(n, 0);
+
+    // Rank配列の構築
+    rep(i, n) {
+        rank[SA[i]] = i;
+    }
+    ll l = 0;
+    rep(i, n) {
+        // SAの先頭なら比較対象がないのでスキップ
+        if (rank[i] == 0) {
+            l = 0; // 次のi+1のためにリセット（ここ重要）
+            continue;
+        }
+        // ひとつ前の順位の接尾辞を取得
+        ll i2 = SA[rank[i] - 1]; 
+        // マッチング（範囲外アクセスに注意しつつ）
+        while (i + l < n && i2 + l < n && t[i + l] == t[i2 + l]) {
+            l++;
+        }
+        // lcp配列はサイズ n-1 なので、rank[i]-1 に格納
+        lcp[rank[i] - 1] = l;
+        // 次のステップのために l を減らす
+        l = max(0ll, l - 1);
+    }
+    return lcp;
+}

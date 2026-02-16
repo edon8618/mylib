@@ -1,0 +1,102 @@
+/**https://atcoder.jp/contests/abc061/submissions/73375343
+ * 
+ * MinCostFlowWithNegative
+ * 負の辺があるグラフで最小費用流を解く
+ * 
+ * 
+ * DAGにしなくても、ソースからシンクにたどり着くのに使ってはいけない辺を消せば期待O(E)
+ * シンクにたどり着くのに使ってはいけない頂点に関する辺をadd_edgeしないのでもよい
+ * ソースからたどり着ける頂点(辺)で、かつシンクから逆順でたどり着ける頂点(辺)　に関する情報のみadd_edgeする
+ * 
+ * 
+ * 使い方は大体acl::mcf_graphと同じ
+ * add_edge(from,to,cap,cost)
+ * flow(from,to) -> (流量、最小費用)
+ * flow(from,to,limit) -> (流量、最小費用)
+ */
+template <typename Cap, typename Cost>
+struct MinCostFlowWithNegative {
+    struct Edge {
+        int from, to;
+        Cap cap;
+        Cost cost;
+    };
+
+    int n;
+    vector<Edge> edges;
+    const Cost INF_COST = numeric_limits<Cost>::max() / 2;
+
+    MinCostFlowWithNegative(int n) : n(n) {}
+
+    void add_edge(int from, int to, Cap cap, Cost cost) {
+        assert(cap>=0);
+        if(cap==0)return;
+        edges.push_back({from, to, cap, cost});
+    }
+
+    // {流量, 最小費用} を返す
+    // 負の閉路がある場合は {0, -INF_COST} (のような異常値) を返すはず
+    pair<Cap, Cost> flow(int s, int t, Cap flow_limit = numeric_limits<Cap>::max()) {
+        // 1. SPFAで初期ポテンシャル h を計算
+        // これにより負の辺があってもダイクストラが使えるようにする
+        vector<Cost> h(n, INF_COST);
+        vector<int> cnt(n, 0);
+        vector<bool> in_queue(n, false);
+        queue<int> q;
+
+        // グラフ構築 (SPFA用)
+        vector<vector<pair<int, Cost>>> g(n);
+        // 容量0の辺はSPFAに使わない（使えない）ので、
+        // ここでは単純化のため「全ての追加された辺は初期状態で通行可能」と仮定して計算する
+        // ※もし初期でcap=0の辺があるなら除外する処理が必要だが、通常add_edgeでcap>0を入れるはず
+        for (const auto& e : edges) {
+            if (e.cap > 0) g[e.from].push_back({e.to, e.cost});
+        }
+
+        h[s] = 0;
+        q.push(s);
+        in_queue[s] = true;
+
+        while (!q.empty()) {
+            int u = q.front(); q.pop();
+            in_queue[u] = false;
+
+            for (auto& edge : g[u]) {
+                int v = edge.first;
+                Cost weight = edge.second;
+                if (h[v] > h[u] + weight) {
+                    h[v] = h[u] + weight;
+                    if (!in_queue[v]) {
+                        q.push(v);
+                        in_queue[v] = true;
+                        // 負閉路検出（簡易）
+                        if (++cnt[v] > n) return {0, -INF_COST}; 
+                    }
+                }
+            }
+        }
+
+        // sから到達できない場合
+        if (h[t] == INF_COST) return {0, 0};
+
+        // 2. ACLのmcf_graphに、ポテンシャルで補正した非負コストの辺を張る
+        // new_cost = cost + h[u] - h[v] >= 0
+        atcoder::mcf_graph<Cap, Cost> mcf(n);
+        for (const auto& e : edges) {
+            // sから到達できない辺は追加しない（追加すると INF - INF でバグる）
+            if (h[e.from] == INF_COST) continue;
+
+            Cost new_cost = e.cost + h[e.from] - h[e.to];
+            mcf.add_edge(e.from, e.to, e.cap, new_cost);
+        }
+
+        // 3. フローを流す
+        auto result = mcf.flow(s, t, flow_limit);
+
+        // 4. 本当のコストを復元
+        // TrueCost = PotentialAdjustedCost + (h[t] - h[s]) * Flow
+        Cost true_cost = result.second + (h[t] - h[s]) * result.first;
+
+        return {result.first, true_cost};
+    }
+};
