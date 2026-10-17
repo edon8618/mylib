@@ -1,0 +1,357 @@
+/**
+ * @brief 完備辞書 (Bit Vector)
+ *
+ * 0/1 のビット列に対して、定数時間で「i 番目までの 1 の個数 (rank)」を計算するデータ構造です。
+ * Wavelet Matrix の内部で使用されますが、単体でも利用可能です。
+ */
+struct BitVector {
+    int n;
+    vector<uint64_t> block;
+    vector<int> sum;
+
+    BitVector() {}
+    BitVector(int _n) : n(_n) {
+        block.assign((n + 63) >> 6, 0);
+        sum.assign(block.size() + 1, 0);
+    }
+
+    void set(int i) {
+        block[i >> 6] |= (1ULL << (i & 63));
+    }
+
+    void build() {
+        for (int i = 0; i < (int)block.size(); ++i) {
+            sum[i + 1] = sum[i] + __builtin_popcountll(block[i]);
+        }
+    }
+
+    // [0, i) の 1 の個数
+    int rank1(int i) const {
+        if (i == 0) return 0;
+        assert(0 <= i && i <= n);
+        if ((i & 63) == 0) return sum[i >> 6];
+        return sum[i >> 6] + __builtin_popcountll(block[i >> 6] & ((1ULL << (i & 63)) - 1));
+    }
+
+    // [0, i) の 0 の個数
+    int rank0(int i) const {
+        return i - rank1(i);
+    }
+
+    // k番目 (0-indexed) の 1 の位置 (存在しなければ -1)
+    int select1(int k) const {
+        if (k < 0 || rank1(n) <= k) return -1;
+        int l = 0, r = n;
+        while (r - l > 1) {
+            int m = (l + r) / 2;
+            if (rank1(m) >= k + 1) r = m;
+            else l = m;
+        }
+        return r - 1;
+    }
+
+    // k番目 (0-indexed) の 0 の位置 (存在しなければ -1)
+    int select0(int k) const {
+        if (k < 0 || rank0(n) <= k) return -1;
+        int l = 0, r = n;
+        while (r - l > 1) {
+            int m = (l + r) / 2;
+            if (rank0(m) >= k + 1) r = m;
+            else l = m;
+        }
+        return r - 1;
+    }
+};
+
+/** https://judge.yosupo.jp/submission/355222
+ * https://atcoder.jp/contests/abc106/submissions/73592699
+ * https://atcoder.jp/contests/abc174/submissions/73592880
+ * @brief Wavelet Matrix (ウェーブレット行列)
+ *
+ * 静的な整数配列に対して、区間内の k 番目の値、指定範囲の値の個数、前後の値の検索などを O(MAXLOG) で処理します。
+ * 内部で完備辞書 (Bit Vector) を用いるため、ノードベースのセグメント木などと比較して省メモリかつ定数倍が軽量です。
+ * 平面走査（座圧・ソート）と組み合わせることで、2次元領域の点のカウントなどにも威力を発揮します。
+ *
+ * @tparam T      配列の要素の型 (例: int, long long など)
+ * @tparam MAXLOG 扱う値の最大ビット数 (値の最大値が 10^9 なら 30 程度。200000 程度なら 18 で十分)
+ * * @param v 構築元の1次元配列。構築には O(N * MAXLOG) の時間がかかります。
+ * 【注意】 値の更新（動的クエリ）には対応していません。負の数を扱う場合はオフセットを足して非負整数に変換してください。
+ *
+ * @par 使用例
+ * @code
+ * vector<ll> A = {3, 1, 4, 1, 5, 9, 2, 6, 5, 3};
+ * // 値の最大値が 9 なので、4ビット (MAXLOG=4) あれば十分
+ * WaveletMatrix<ll, 4> wm(A);
+ * * // 区間 [2, 8) (要素: 4, 1, 5, 9, 2, 6) に対するクエリ
+ * int c1 = wm.range_freq(2, 8, 4, 7);  // 4以上7未満の個数 -> 3個 (4, 5, 6)
+ * ll  v1 = wm.kth_smallest(2, 8, 2);   // 3番目 (0-indexedで2) に小さい値 -> 4 (ソートすると 1, 2, 4, 5, 6, 9)
+ * ll  v2 = wm.prev_value(2, 8, 5);     // 5より小さい最大の要素 -> 4
+ * @endcode
+ */
+template <typename T, int MAXLOG>
+struct WaveletMatrix {
+    static_assert(std::is_integral_v<T> && MAXLOG > 0 && MAXLOG <= std::numeric_limits<T>::digits);
+    int n;
+    vector<BitVector> bv;
+    vector<int> mid;
+
+    WaveletMatrix() {}
+    WaveletMatrix(vector<T> v) : n(v.size()) {
+        bv.assign(MAXLOG, BitVector(n));
+        mid.resize(MAXLOG);
+        vector<T> l(n), r(n);
+        
+        for (int d = MAXLOG - 1; d >= 0; --d) {
+            int l_idx = 0, r_idx = 0;
+            for (int i = 0; i < n; ++i) {
+                if ((v[i] >> d) & 1) {
+                    bv[d].set(i);
+                    r[r_idx++] = v[i];
+                } else {
+                    l[l_idx++] = v[i];
+                }
+            }
+            bv[d].build();
+            mid[d] = l_idx;
+            for (int i = 0; i < l_idx; ++i) v[i] = l[i];
+            for (int i = 0; i < r_idx; ++i) v[l_idx + i] = r[i];
+        }
+    }
+
+    // 1. i 番目の要素を取得
+    T access(int i) const {
+        T res = 0;
+        for (int d = MAXLOG - 1; d >= 0; --d) {
+            bool b = (bv[d].block[i >> 6] >> (i & 63)) & 1;
+            if (b) {
+                res |= (T(1) << d);
+                i = mid[d] + bv[d].rank1(i);
+            } else {
+                i = bv[d].rank0(i);
+            }
+        }
+        return res;
+    }
+
+    // 2. [l, r) のうち、値が x の要素数を返す
+    int rank(int l, int r, T x) const {
+        if (x < 0 || ((std::make_unsigned_t<T>(x) >> (MAXLOG - 1)) >> 1) != 0) return 0;
+        for (int d = MAXLOG - 1; d >= 0; --d) {
+            bool b = (x >> d) & 1;
+            int l_b = (b ? bv[d].rank1(l) : bv[d].rank0(l));
+            int r_b = (b ? bv[d].rank1(r) : bv[d].rank0(r));
+            l = (b ? mid[d] + l_b : l_b);
+            r = (b ? mid[d] + r_b : r_b);
+        }
+        return r - l;
+    }
+
+    // 3. [l, r) のうち、k 番目 (0-indexed) に小さい値を返す
+    T kth_smallest(int l, int r, int k) const {
+        assert(0 <= k && k < r - l);
+        T res = 0;
+        for (int d = MAXLOG - 1; d >= 0; --d) {
+            int l0 = bv[d].rank0(l), r0 = bv[d].rank0(r);
+            int c0 = r0 - l0; // 0 に進む要素数
+            if (k < c0) {
+                l = l0;
+                r = r0;
+            } else {
+                k -= c0;
+                res |= (T(1) << d);
+                l = mid[d] + (l - l0);
+                r = mid[d] + (r - r0);
+            }
+        }
+        return res;
+    }
+
+    // 4. [l, r) のうち、k 番目 (0-indexed) に大きい値を返す
+    T kth_largest(int l, int r, int k) const {
+        return kth_smallest(l, r, r - l - 1 - k);
+    }
+
+    // 5. [l, r) のうち、値が upper 未満の要素数を返す
+    int rank_less_than(int l, int r, T upper) const {
+        if (l >= r || upper <= 0) return 0;
+        if (((std::make_unsigned_t<T>(upper) >> (MAXLOG - 1)) >> 1) != 0) return r - l;
+        int res = 0;
+        for (int d = MAXLOG - 1; d >= 0; --d) {
+            bool b = (upper >> d) & 1;
+            int l0 = bv[d].rank0(l), r0 = bv[d].rank0(r);
+            if (b) {
+                res += r0 - l0;
+                l = mid[d] + (l - l0);
+                r = mid[d] + (r - r0);
+            } else {
+                l = l0; r = r0;
+            }
+        }
+        return res;
+    }
+
+    // 6. [l, r) のうち、値が [lower, upper) に含まれる要素数を返す
+    int range_freq(int l, int r, T lower, T upper) const {
+        if (l >= r || lower >= upper) return 0;
+        return rank_less_than(l, r, upper) - rank_less_than(l, r, lower);
+    }
+
+    // 7. [l, r) のうち、値が upper 未満のものの最大値を返す (存在しなければ -1 を返す)
+    T prev_value(int l, int r, T upper) const {
+        int cnt = rank_less_than(l, r, upper);
+        if (cnt == 0) return T(-1);
+        return kth_smallest(l, r, cnt - 1);
+    }
+
+    // 8. [l, r) のうち、値が lower 以上のものの最小値を返す (存在しなければ -1 を返す)
+    T next_value(int l, int r, T lower) const {
+        int cnt = rank_less_than(l, r, lower);
+        if (cnt == r - l) return T(-1);
+        return kth_smallest(l, r, cnt);
+    }
+};
+
+/** https://atcoder.jp/contests/awc0015/submissions/73652165
+ * @brief 座標圧縮付き Wavelet Matrix
+ * * 内部で値を自動的に座圧（0-indexedの非負整数に変換）してから Wavelet Matrix に乗せます。
+ * 負の値や 10^18 のような巨大な値もそのまま放り込めます。
+ * 座圧後の最大値は要素数 N を超えないため、MAXLOG は 20 (N <= 10^6) もあれば十分です。
+ */
+template <typename T, int MAXLOG = 20>
+struct CompressedWaveletMatrix {
+    int n;
+    WaveletMatrix<int, MAXLOG> wm;
+    vector<T> vals; // 座圧復元用の配列
+
+    CompressedWaveletMatrix() {}
+    CompressedWaveletMatrix(const vector<T>& v) : n(v.size()) {
+        vals = v;
+        sort(vals.begin(), vals.end());
+        vals.erase(unique(vals.begin(), vals.end()), vals.end());
+        
+        vector<int> comp(n);
+        for (int i = 0; i < n; ++i) {
+            comp[i] = lower_bound(vals.begin(), vals.end(), v[i]) - vals.begin();
+        }
+        wm = WaveletMatrix<int, MAXLOG>(comp);
+    }
+
+    // 1. i 番目の要素を取得
+    T access(int i) const {
+        return vals[wm.access(i)];
+    }
+
+    // 2. [l, r) のうち、値が x の要素数を返す
+    int rank(int l, int r, T x) const {
+        if (x < 0 || ((std::make_unsigned_t<T>(x) >> (MAXLOG - 1)) >> 1) != 0) return 0;
+        auto it = lower_bound(vals.begin(), vals.end(), x);
+        if (it == vals.end() || *it != x) return 0;
+        return wm.rank(l, r, it - vals.begin());
+    }
+
+    // 3. [l, r) のうち、k 番目に小さい値を返す
+    T kth_smallest(int l, int r, int k) const {
+        return vals[wm.kth_smallest(l, r, k)];
+    }
+
+    // 4. [l, r) のうち、k 番目に大きい値を返す
+    T kth_largest(int l, int r, int k) const {
+        return vals[wm.kth_largest(l, r, k)];
+    }
+
+    // 5. [l, r) のうち、値が upper 未満の要素数を返す
+    int rank_less_than(int l, int r, T upper) const {
+        int comp_upper = lower_bound(vals.begin(), vals.end(), upper) - vals.begin();
+        return wm.rank_less_than(l, r, comp_upper);
+    }
+
+    // 6. [l, r) のうち、値が [lower, upper) に含まれる要素数を返す
+    int range_freq(int l, int r, T lower, T upper) const {
+        return rank_less_than(l, r, upper) - rank_less_than(l, r, lower);
+    }
+
+    // 7. [l, r) のうち、値が upper 未満のものの最大値を返す (存在しなければ T(-1) を返す)
+    T prev_value(int l, int r, T upper) const {
+        int comp_upper = lower_bound(vals.begin(), vals.end(), upper) - vals.begin();
+        int res_comp = wm.prev_value(l, r, comp_upper);
+        if (res_comp == -1) return T(-1);
+        return vals[res_comp];
+    }
+
+    // 8. [l, r) のうち、値が lower 以上のものの最小値を返す (存在しなければ T(-1) を返す)
+    T next_value(int l, int r, T lower) const {
+        int comp_lower = lower_bound(vals.begin(), vals.end(), lower) - vals.begin();
+        int res_comp = wm.next_value(l, r, comp_lower);
+        if (res_comp == -1) return T(-1);
+        return vals[res_comp];
+    }
+};
+
+/**https://atcoder.jp/contests/abc461/submissions/76493402
+ * @brief 区間種類数クエリ (Range Distinct Query)
+ *
+ * 静的配列の区間 [l, r) に含まれる値の種類数 (Distinct Values) を O(log N) で求めます。
+ * 内部で Compressed Wavelet Matrix を使用し、「各要素の直前の出現位置 (prev_idx)」を
+ * マッピングすることで、区間内の初出要素を高速にカウントします。
+ *
+ * @tparam T 配列の要素の型 (例: int, long long など)
+ * * @par 使用例1: シンプルに配列の種類数を求める場合
+ * @code
+ * vector<ll> A = {3, 1, 4, 1, 5, 9, 2, 6, 5, 3};
+ * RangeDistinctQuery<ll> rdq(A);
+ * int c = rdq.query(2, 8); // 区間 [2, 8) (要素: 4, 1, 5, 9, 2, 6) の種類数 -> 6
+ * @endcode
+ * * @par 使用例2: 特定の値を無視して構築 ＆ L (前回位置) をサボって取得する場合
+ * @code
+ * // -1 がダミー値として混ざっている配列
+ * vector<ll> A = {10, -1, 10, 20, -1};
+ * // 第2引数=true, 第3引数=-1 で「-1 を無視(カウント除外)」して構築
+ * RangeDistinctQuery<ll> rdq(A, true, -1);
+ * * int L = rdq.get_prev(2); // i=2 (値: 10) の直前の出現位置 -> 0
+ * int c = rdq.query(1, 4); // 区間 [1, 4) (要素: -1, 10, 20) の種類数 -> 2 (-1は無視される)
+ * @endcode
+ */
+template <typename T>
+struct RangeDistinctQuery {
+    CompressedWaveletMatrix<int, 20> wm;
+    vector<int> prev_idx; // Lを作るのをサボるための保持配列
+
+    RangeDistinctQuery() {}
+
+    /**
+     * @param a 対象の配列
+     * @param use_ignore 無視したい特定の値がある場合は true
+     * @param ignore_val この値と一致する要素はカウントから除外する
+     */
+    RangeDistinctQuery(const vector<T>& a, bool use_ignore = false, T ignore_val = T()) {
+        int n = a.size();
+        prev_idx.assign(n, -1);
+        vector<int> wm_init(n, -1); // WM構築用の内部配列
+        map<T, int> last_pos;
+        
+        for (int i = 0; i < n; ++i) {
+            // 無視する値の場合、WMには巨大な値を突っ込んで除外し、prev は -1 のままにする
+            if (use_ignore && a[i] == ignore_val) {
+                wm_init[i] = 1e9; 
+                continue;
+            }
+            if (last_pos.count(a[i])) {
+                prev_idx[i] = last_pos[a[i]];
+                wm_init[i] = prev_idx[i];
+            }
+            last_pos[a[i]] = i;
+        }
+        wm = CompressedWaveletMatrix<int, 20>(wm_init);
+    }
+
+    // 区間 [l, r) の種類数を返す
+    int query(int l, int r) const {
+        if (l >= r) return 0;
+        return wm.rank_less_than(l, r, l);
+    }
+
+    // i番目の要素が、直前にどこに出現したか (L) を返す。初出や無視要素なら -1
+    int get_prev(int i) const {
+        return prev_idx[i];
+    }
+};

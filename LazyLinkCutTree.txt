@@ -1,0 +1,193 @@
+/**https://onlinejudge.u-aizu.ac.jp/problems/2450
+ * Lazy Link Cut Tree (非可換演算・遅延評価対応版)
+ * * [概要]
+ * 動的木(森)に対する操作を O(log N) で行うデータ構造。
+ * ACL の lazy_segtree と同様のテンプレート引数を取り、パス更新・パス取得に対応。
+ * 非可換演算(行列積など)も prod/rev_prod 管理により rev_op 不要で動作します。
+ *
+ * [テンプレート引数]
+ * S: 値の型
+ * op: S * S -> S (結合則)
+ * e: S の単位元
+ * F: 操作(作用素)の型
+ * mapping: F * S -> S (操作の適用)
+ * composition: F * F -> F (操作の合成 composition(new, old))
+ * id: F の単位元 (恒等写像)
+ *
+ * [主な機能]
+ * - link(u, v), cut(u, v): 辺の追加・削除
+ * - apply(u, v, f): u-v パス全体に操作 f を適用 (Lazy Propagation)
+ * - set(v, x): 頂点 v の値を x に更新
+ * - split(u, v) -> get_prod(v): u->v パスの積を取得
+ */
+template <class S,
+          S (*op)(S, S),
+          S (*e)(),
+          class F,
+          S (*mapping)(F, S),
+          F (*composition)(F, F),
+          F (*id)()>
+struct LazyLinkCutTree {
+private:
+    struct Node {
+        int l, r, p;
+        S val;
+        S prod;     // 順方向 (u -> v)
+        S rev_prod; // 逆方向 (v -> u)
+        F lazy;     // 遅延している操作
+        bool rev;   // 反転フラグ
+        int sz;
+    };
+
+    vector<Node> nodes;
+
+    bool is_root(int t) {
+        int p = nodes[t].p;
+        return p == -1 || (nodes[p].l != t && nodes[p].r != t);
+    }
+
+    void push_up(int t) {
+        if (t == -1) return;
+        nodes[t].sz = 1;
+
+        // --- 順方向 (prod) ---
+        nodes[t].prod = nodes[t].val;
+        if (nodes[t].l != -1) {
+            nodes[t].sz += nodes[nodes[t].l].sz;
+            nodes[t].prod = op(nodes[nodes[t].l].prod, nodes[t].prod);
+        }
+        if (nodes[t].r != -1) {
+            nodes[t].sz += nodes[nodes[t].r].sz;
+            nodes[t].prod = op(nodes[t].prod, nodes[nodes[t].r].prod);
+        }
+
+        // --- 逆方向 (rev_prod) ---
+        nodes[t].rev_prod = nodes[t].val;
+        if (nodes[t].r != -1) {
+            nodes[t].rev_prod = op(nodes[nodes[t].r].rev_prod, nodes[t].rev_prod);
+        }
+        if (nodes[t].l != -1) {
+            nodes[t].rev_prod = op(nodes[t].rev_prod, nodes[nodes[t].l].rev_prod);
+        }
+    }
+
+    // 遅延作用素の適用
+    void all_apply(int t, F f) {
+        if (t == -1) return;
+        nodes[t].val = mapping(f, nodes[t].val);
+        nodes[t].prod = mapping(f, nodes[t].prod);
+        nodes[t].rev_prod = mapping(f, nodes[t].rev_prod);
+        nodes[t].lazy = composition(f, nodes[t].lazy);
+    }
+
+    // 反転処理 (値の反転＋フラグ反転)
+    void toggle(int t) {
+        if (t == -1) return;
+        swap(nodes[t].l, nodes[t].r);
+        swap(nodes[t].prod, nodes[t].rev_prod);
+        nodes[t].rev ^= true;
+    }
+
+    // 遅延伝搬
+    void push_down(int t) {
+        if (t == -1) return;
+
+        // 1. 反転フラグの伝搬
+        if (nodes[t].rev) {
+            if (nodes[t].l != -1) toggle(nodes[t].l);
+            if (nodes[t].r != -1) toggle(nodes[t].r);
+            nodes[t].rev = false;
+        }
+
+        // 2. 作用素の伝搬
+        if (nodes[t].lazy != id()) {
+            if (nodes[t].l != -1) all_apply(nodes[t].l, nodes[t].lazy);
+            if (nodes[t].r != -1) all_apply(nodes[t].r, nodes[t].lazy);
+            nodes[t].lazy = id();
+        }
+    }
+
+    void rotate(int t) {
+        int p = nodes[t].p; int pp = nodes[p].p;
+        if (!is_root(p)) { if (nodes[pp].l == p) nodes[pp].l = t; else nodes[pp].r = t; }
+        nodes[t].p = pp;
+        if (nodes[p].l == t) { nodes[p].l = nodes[t].r; if (nodes[t].r != -1) nodes[nodes[t].r].p = p; nodes[t].r = p; }
+        else { nodes[p].r = nodes[t].l; if (nodes[t].l != -1) nodes[nodes[t].l].p = p; nodes[t].l = p; }
+        nodes[p].p = t;
+        push_up(p); push_up(t);
+    }
+    void splay(int t) {
+        vector<int> path; int curr = t;
+        while (!is_root(curr)) { path.push_back(curr); curr = nodes[curr].p; }
+        path.push_back(curr);
+        while (!path.empty()) { push_down(path.back()); path.pop_back(); }
+        while (!is_root(t)) {
+            int p = nodes[t].p;
+            if (is_root(p)) { rotate(t); }
+            else {
+                int pp = nodes[p].p;
+                if ((nodes[pp].l == p) == (nodes[p].l == t)) { rotate(p); rotate(t); }
+                else { rotate(t); rotate(t); }
+            }
+        }
+    }
+    int access(int t) {
+        int last = -1;
+        for (int v = t; v != -1; v = nodes[v].p) {
+            splay(v); nodes[v].r = last; push_up(v); last = v;
+        }
+        splay(t); return last;
+    }
+    void make_root(int t) { access(t); toggle(t); push_down(t); }
+    int get_kth_internal(int t, int k) {
+        push_down(t);
+        int l_size = (nodes[t].l != -1) ? nodes[nodes[t].l].sz : 0;
+        if (k < l_size) return get_kth_internal(nodes[t].l, k);
+        if (k == l_size) { splay(t); return t; }
+        return get_kth_internal(nodes[t].r, k - l_size - 1);
+    }
+
+public:
+    LazyLinkCutTree(int n) : nodes(n) {
+        for (int i = 0; i < n; i++) nodes[i] = {-1, -1, -1, e(), e(), e(), id(), false, 1};
+    }
+
+    void link(int u, int v) {
+        make_root(u);
+        if (find_root(v) == u) return;
+        nodes[u].p = v;
+    }
+
+    void cut(int u, int v) {
+        make_root(u); access(v);
+        if (nodes[v].l != u || nodes[u].r != -1) return;
+        nodes[v].l = -1; nodes[u].p = -1; push_up(v);
+    }
+
+    bool is_connected(int u, int v) { return find_root(u) == find_root(v); }
+
+    int find_root(int v) {
+        access(v);
+        while (nodes[v].l != -1) { push_down(v); v = nodes[v].l; }
+        splay(v); return v;
+    }
+
+    // u-v パスを抽出 (vがSplay木の根になる)
+    void split(int u, int v) { make_root(u); access(v); }
+
+    // u-v パス全体に操作 f を適用
+    void apply(int u, int v, F f) {
+        split(u, v);
+        all_apply(v, f);
+    }
+
+    // 頂点 v の値を更新 (Lazyの影響を受けるため splay 必要)
+    void set(int v, S x) { splay(v); nodes[v].val = x; push_up(v); }
+    S get(int v) { splay(v); return nodes[v].val; }
+    
+    // split(u, v) 直後に呼ぶ。パス全体の積 (u->v 順)
+    S get_prod(int v) { return nodes[v].prod; }
+    
+    int get_sz(int v) { return nodes[v].sz; }
+    int get_kth(int v, int k) { return get_kth_internal(v, k); }
+};

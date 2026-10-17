@@ -1,0 +1,49 @@
+/** CRT(r1,m1,r2,m2) -> {normalized residue, lcm}; no solution -> {0,0}.
+ * T: signed integer (__int128 allowed) or boost::multiprecision::cpp_int.
+ * Positive moduli required. All intermediate arithmetic stays in T.
+ * Bounded types detect overflow and throw overflow_error: retry with a wider T.
+ * cpp_int uses arbitrary precision; no forced promotion/heap allocation for fixed-width T.
+ * This file is self-contained; extend_gcd.txt is no longer required.
+ */
+namespace crt_detail {
+    template<class T> T add(T a,T b) {
+        if constexpr(std::numeric_limits<T>::is_bounded) {
+            T out; if(__builtin_add_overflow(a,b,&out))throw std::overflow_error("CRT intermediate overflow; widen T");return out;
+        }else return T(a+b);
+    }
+    template<class T> T sub(T a,T b) {
+        if constexpr(std::numeric_limits<T>::is_bounded) {
+            T out; if(__builtin_sub_overflow(a,b,&out))throw std::overflow_error("CRT intermediate overflow; widen T");return out;
+        }else return T(a-b);
+    }
+    template<class T> T mul(T a,T b) {
+        if constexpr(std::numeric_limits<T>::is_bounded) {
+            T out; if(__builtin_mul_overflow(a,b,&out))throw std::overflow_error("CRT intermediate overflow; widen T");return out;
+        }else return T(a*b);
+    }
+    template<class T> T mod(T a,T m) { T r=a%m;return r<0?add(r,m):r; }
+    template<class T> T egcd(T a,T b,T& x,T& y) {
+        if(b==0){x=1;y=0;return a;}
+        T x1,y1;T g=egcd<T>(b,T(a%b),x1,y1);
+        x=y1;y=sub<T>(x1,mul<T>(T(a/b),y1));return g;
+    }
+}
+template<class T> T safe_mod(T a,T m) {
+    if(m<=0)throw std::invalid_argument("CRT modulus must be positive");
+    return crt_detail::mod<T>(a,m);
+}
+template<class T> std::pair<T,T> CRT(T r1,T m1,T r2,T m2) {
+    static_assert(std::numeric_limits<T>::is_integer && std::numeric_limits<T>::is_signed);
+    if(m1<=0||m2<=0)throw std::invalid_argument("CRT modulus must be positive");
+    r1=crt_detail::mod<T>(r1,m1);r2=crt_detail::mod<T>(r2,m2);
+    T p,q;T g=crt_detail::egcd<T>(m1,m2,p,q);
+    T diff=crt_detail::sub<T>(r2,r1);
+    if(diff%g!=0)return {T(0),T(0)};
+    T m=crt_detail::mul<T>(T(m1/g),m2),m2g=m2/g;
+    T term=crt_detail::mod<T>(T(diff/g),m2g);
+    T k=crt_detail::mod<T>(crt_detail::mul<T>(p,term),m2g);
+    T part=crt_detail::mul<T>(m1,k);
+    // Modular addition without overflowing even when the final residue fits.
+    T x=part>=m-r1?T(part-(m-r1)):crt_detail::add<T>(r1,part);
+    return {x,m};
+}

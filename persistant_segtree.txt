@@ -1,0 +1,180 @@
+// 永続セグメント木
+// ACLのsegtreeと同様のインターフェース
+template <class S, S (*op)(S, S), S (*e)()>
+struct persistent_segtree {
+private:
+    struct Node {
+        S value;
+        Node* left;
+        Node* right;
+        Node(S v = e()) : value(v), left(nullptr), right(nullptr) {}
+        Node(S v, Node* l, Node* r) : value(v), left(l), right(r) {}
+    };
+
+    int _n, _log, _size;
+    std::vector<Node*> roots;
+    
+    Node* build(const std::vector<S>& v, int l, int r) {
+        if (r - l == 1) {
+            if (l < (int)v.size()) {
+                return new Node(v[l]);
+            } else {
+                return new Node(e());
+            }
+        }
+        int m = (l + r) / 2;
+        Node* left_child = build(v, l, m);
+        Node* right_child = build(v, m, r);
+        return new Node(op(left_child->value, right_child->value), left_child, right_child);
+    }
+    
+    Node* update(Node* node, int pos, S x, int l, int r) {
+        if (r - l == 1) {
+            return new Node(x);
+        }
+        int m = (l + r) / 2;
+        if (pos < m) {
+            Node* new_left = update(node->left, pos, x, l, m);
+            return new Node(op(new_left->value, node->right->value), new_left, node->right);
+        } else {
+            Node* new_right = update(node->right, pos, x, m, r);
+            return new Node(op(node->left->value, new_right->value), node->left, new_right);
+        }
+    }
+    
+    S query(Node* node, int a, int b, int l, int r) const {
+        if (b <= l || r <= a || !node) return e();
+        if (a <= l && r <= b) return node->value;
+        int m = (l + r) / 2;
+        return op(query(node->left, a, b, l, m), query(node->right, a, b, m, r));
+    }
+    
+    S get_impl(Node* node, int pos, int l, int r) const {
+        if (r - l == 1) return node->value;
+        int m = (l + r) / 2;
+        if (pos < m) {
+            return get_impl(node->left, pos, l, m);
+        } else {
+            return get_impl(node->right, pos, m, r);
+        }
+    }
+
+
+    // f(e()) == true, f is monotone. Returns the first failing position
+    // (or the segment's right end if the entire relevant suffix passes).
+    template <class F>
+    int max_right_dfs(Node* node, int a, int b, int l, S& acc, F& f) const {
+        if (b <= l) return b;
+        if (l <= a) {
+            S nxt = op(acc, node->value);
+            if (f(nxt)) {
+                acc = nxt;
+                return b;
+            }
+            if (b - a == 1) return a;
+        }
+        int m = (a + b) / 2;
+        int x = max_right_dfs(node->left, a, m, l, acc, f);
+        if (x < m) return x;
+        return max_right_dfs(node->right, m, b, l, acc, f);
+    }
+
+    // Symmetric scan from the right, keeping non-commutative order.
+    template <class F>
+    int min_left_dfs(Node* node, int a, int b, int r, S& acc, F& f) const {
+        if (r <= a) return a;
+        if (b <= r) {
+            S nxt = op(node->value, acc);
+            if (f(nxt)) {
+                acc = nxt;
+                return a;
+            }
+            if (b - a == 1) return b;
+        }
+        int m = (a + b) / 2;
+        int x = min_left_dfs(node->right, m, b, r, acc, f);
+        if (x > m) return x;
+        return min_left_dfs(node->left, a, m, r, acc, f);
+    }
+
+public:
+    persistent_segtree() : persistent_segtree(0) {}
+    
+    explicit persistent_segtree(int n) : persistent_segtree(std::vector<S>(n, e())) {}
+    
+    explicit persistent_segtree(const std::vector<S>& v) : _n(v.size()) {
+        _log = 0;
+        _size = 1;
+        while (_size < _n) {
+            _size *= 2;
+            _log++;
+        }
+        roots.push_back(build(v, 0, _size));
+    }
+    
+    int version() const {
+        return (int)roots.size() - 1;
+    }
+    
+    int set(int pos, S x, int ver = -1) {
+        assert(0 <= pos && pos < _n);
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        Node* new_root = update(roots[ver], pos, x, 0, _size);
+        roots.push_back(new_root);
+        return (int)roots.size() - 1;
+    }
+    
+    S get(int pos, int ver = -1) const {
+        assert(0 <= pos && pos < _n);
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        return get_impl(roots[ver], pos, 0, _size);
+    }
+    
+    S prod(int l, int r, int ver = -1) const {
+        assert(0 <= l && l <= r && r <= _n);
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        return query(roots[ver], l, r, 0, _size);
+    }
+    
+    S all_prod(int ver = -1) const {
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        return roots[ver]->value;
+    }
+    
+    template <bool (*f)(S)>
+    int max_right(int l, int ver = -1) const {
+        return max_right(l, [](S x) { return f(x); }, ver);
+    }
+    
+    template <class F>
+    int max_right(int l, F f, int ver = -1) const {
+        assert(0 <= l && l <= _n);
+        assert(f(e()));
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        if (l == _n) return _n;
+        S acc = e();
+        return std::min(_n, max_right_dfs(roots[ver], 0, _size, l, acc, f));
+    }
+
+    template <bool (*f)(S)>
+    int min_left(int r, int ver = -1) const {
+        return min_left(r, [](S x) { return f(x); }, ver);
+    }
+    
+    template <class F>
+    int min_left(int r, F f, int ver = -1) const {
+        assert(0 <= r && r <= _n);
+        assert(f(e()));
+        if (ver == -1) ver = version();
+        assert(0 <= ver && ver < (int)roots.size());
+        if (r == 0) return 0;
+        S acc = e();
+        return min_left_dfs(roots[ver], 0, _size, r, acc, f);
+    }
+
+};

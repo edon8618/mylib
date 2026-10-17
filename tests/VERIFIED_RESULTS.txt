@@ -1,0 +1,50 @@
+### persistent_log.txt
+persistent PASS
+
+### persistent_san_log.txt
+persistent PASS
+
+### fps_log.txt
+fps PASS
+negative pow rejected PASS
+
+### fps_basic_san_log.txt
+fps PASS
+
+### fps_extended_log.txt
+FPS extended PASS 1006 checks; actual ACL
+
+### fps_extended_san_log.txt
+FPS extended PASS 1006 checks; actual ACL
+
+### fps_release_log.txt
+negative pow rejected PASS
+
+### test_log.txt
+B02 B03 PASS
+B04 B16 PASS
+B12 B13 B17 B20 PASS
+B14 B19 PASS
+B11 PASS
+B10 PASS
+B15 PASS
+revision PASS
+
+### revision_san_log.txt
+B02 B03 PASS
+B04 B16 PASS
+B12 B13 B17 B20 PASS
+B14 B19 PASS
+B11 PASS
+B10 PASS
+B15 PASS
+revision PASS
+
+### binomial_bench_log.txt
+original32 mod=998244353 median_ms=56.505 checksum=99854072930001
+forced128 mod=998244353 median_ms=55.372 checksum=99854072930001
+hybrid32 mod=998244353 median_ms=48.660 checksum=99854072930001
+hybrid64 mod=10460353203 median_ms=160.501 checksum=1043921608387884
+
+### modmul_bench_log.txt
+modmul mod=998244353 operations=2000000 barrett_ms=6.65504 wide_ms=9.71475 checksum=999271228573382

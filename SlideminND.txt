@@ -1,0 +1,127 @@
+// 内部処理用のヘルパー関数群（ユーザーが直接呼ぶ必要はありません）
+namespace SlideMinND {
+    // 1. 再帰的に要素の型（T）を判定
+    template <typename T> struct base_type { using type = T; };
+    template <typename T> struct base_type<vector<T>> { using type = typename base_type<T>::type; };
+
+    // 2. 多次元配列から各次元の長さを取得
+    template <typename T> void get_shape(const T&, vector<int>&) {}
+    template <typename T> void get_shape(const vector<T>& v, vector<int>& shape) {
+        shape.push_back(v.size());
+        if (!v.empty()) get_shape(v[0], shape);
+    }
+
+    // 3. 多次元配列を1次元に平坦化
+    template <typename T, typename U> void flatten(const T& val, vector<U>& flat) { flat.push_back(val); }
+    template <typename T, typename U> void flatten(const vector<T>& v, vector<U>& flat) {
+        for (const auto& x : v) flatten(x, flat);
+    }
+
+    // 4. 指定した形状で空の多次元配列を構築
+    template <typename T> void resize_nested(T&, const vector<int>&, int) {}
+    template <typename T> void resize_nested(vector<T>& v, const vector<int>& shape, int depth = 0) {
+        v.resize(shape[depth]);
+        for (auto& child : v) resize_nested(child, shape, depth + 1);
+    }
+
+    // 5. 1次元配列から多次元配列に値を復元
+    template <typename T, typename U> void build_nested(T& val, const vector<U>& flat, int& idx) { val = flat[idx++]; }
+    template <typename T, typename U> void build_nested(vector<T>& v, const vector<U>& flat, int& idx) {
+        for (auto& x : v) build_nested(x, flat, idx);
+    }
+}
+
+// ユーザーが使うメイン関数
+/**
+ * @brief 多次元スライド最小値 (N-Dimensional Sliding Window Minimum)
+ *
+ * 任意の次元数の `std::vector` の入れ子構造に対して、指定した窓サイズでのスライド最小値を O(全要素数) で計算します。
+ * 内部で1次元に平坦化して単調キューを適用するため、定数倍も非常に軽量です。
+ *
+ * @tparam NestedVec 任意の深さの std::vector (例: vector<ll>, vector<vector<int>> など)
+ * @param arr        走査対象の多次元配列。
+ * @param window     各次元のスライド窓のサイズを指定する配列。
+ * 【注意】 `window.size()` は `arr` の次元数（入れ子の深さ）と完全に一致している必要があります。
+ *
+ * @return NestedVec 入力 `arr` と全く同じ型の多次元配列を返します。
+ * 各次元 d のサイズは `(元のサイズ - window[d] + 1)` となります。
+ *
+ * @par 使用例
+ * @code
+ * // 1次元の例 (長さ5の配列からサイズ3の窓で最小値を取得)
+ * vector<ll> A = {3, 1, 4, 2, 5};
+ * auto res1 = slide_min(A, {3}); 
+ * // res1: {1, 1, 2} (サイズ: 5 - 3 + 1 = 3)
+ *
+ * // 2次元の例 (H*W のグリッドから th*tw の窓で最小値を取得)
+ * vector<vector<ll>> grid = {{...}, {...}, ...};
+ * auto res2 = slide_min(grid, {th, tw});
+ * // res2[i][j] には、左上を (i, j) とした th*tw 領域内の最小値が入る
+ * @endcode
+ */
+template <typename NestedVec>
+NestedVec slide_min(const NestedVec& arr, const vector<ll>& window) {
+    using T = typename SlideMinND::base_type<NestedVec>::type;
+    
+    // 形状取得
+    vector<int> shape;
+    SlideMinND::get_shape(arr, shape);
+    int m = shape.size();
+    assert(m == (int)window.size());
+    
+    // 内部処理のために1次元に平坦化（計算量を落とすため）
+    vector<T> data;
+    SlideMinND::flatten(arr, data);
+    
+    // 各次元に対して独立にスライド最小値を適用
+    for (int d = 0; d < m; ++d) {
+        int w = window[d];
+        if (w <= 1) continue;
+        
+        int old_dim = shape[d];
+        int new_dim = old_dim - w + 1;
+        assert(new_dim > 0);
+        
+        int stride = 1;
+        for (int i = d + 1; i < m; ++i) stride *= shape[i];
+        
+        vector<int> next_shape = shape;
+        next_shape[d] = new_dim;
+        
+        int next_total = 1;
+        for (int s : next_shape) next_total *= s;
+        vector<T> next_data(next_total);
+        
+        int block_old = old_dim * stride;
+        int block_new = new_dim * stride;
+        
+        for (int b_old = 0, b_new = 0; b_old < (int)data.size(); b_old += block_old, b_new += block_new) {
+            for (int offset = 0; offset < stride; ++offset) {
+                deque<int> dq;
+                for (int i = 0; i < old_dim; ++i) {
+                    T val = data[b_old + offset + i * stride];
+                    
+                    // ウィンドウ外のインデックスを削除
+                    while (!dq.empty() && dq.front() <= i - w) dq.pop_front();
+                    // 最小値なので、新しい値以上の古い値を削除（最大値なら <= にする）
+                    while (!dq.empty() && data[b_old + offset + dq.back() * stride] >= val) dq.pop_back();
+                    
+                    dq.push_back(i);
+                    if (i >= w - 1) {
+                        next_data[b_new + offset + (i - w + 1) * stride] = data[b_old + offset + dq.front() * stride];
+                    }
+                }
+            }
+        }
+        shape = next_shape;
+        data = move(next_data);
+    }
+    
+    // 結果の多次元配列を構築して返す
+    NestedVec res;
+    SlideMinND::resize_nested(res, shape, 0);
+    int idx = 0;
+    SlideMinND::build_nested(res, data, idx);
+    
+    return res;
+}

@@ -1,0 +1,41 @@
+// weighted unionfind
+struct WeightedUnionFind {
+    vector<ll> par, rank, diff_weight;
+
+    WeightedUnionFind(ll n) : par(n), rank(n, 0), diff_weight(n, 0) {
+        for (ll i = 0; i < n; i++) par[i] = i;
+    }
+
+    ll find(ll x) {
+        if (par[x] == x) return x;
+        ll r = find(par[x]);
+        diff_weight[x] += diff_weight[par[x]];
+        return par[x] = r;
+    }
+
+    ll weight(ll x) {
+        find(x);
+        return diff_weight[x];
+    }
+
+    bool unite(ll x, ll y, ll w) {// a[y] - a[x] = w
+        w += weight(x);
+        w -= weight(y);
+        x = find(x);
+        y = find(y);
+        if (x == y) return false;
+        if (rank[x] < rank[y]) swap(x, y), w = -w;
+        if (rank[x] == rank[y]) rank[x]++;
+        par[y] = x;
+        diff_weight[y] = w;
+        return true;
+    }
+
+    bool same(ll x, ll y) {
+        return find(x) == find(y);
+    }
+
+    ll diff(ll x, ll y) {// return a[y]-a[x]
+        return weight(y) - weight(x);
+    }
+};

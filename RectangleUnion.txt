@@ -1,0 +1,111 @@
+// 長方形の和集合の面積を求めるための構造体
+// 内部で ACL の lazy_segtree を使用していますが、
+// 型定義(S, opなど)を内部に隠蔽しているため、外側で自由に S, op を定義できます。
+struct RectangleUnion {
+
+    // --- 内部で使用する型と関数 (外部の S や op と競合しない) ---
+    struct Node {
+        ll mn;  // 被覆回数の最小値
+        ll len; // その最小値をとる区間の長さ
+    };
+    using Tag = ll; // 加算する値
+
+    static Node op(Node a, Node b) {
+        if (a.mn < b.mn) return a;
+        if (a.mn > b.mn) return b;
+        return Node{a.mn, a.len + b.len};
+    }
+
+    static Node e() {
+        return Node{2000000000000000000LL, 0};
+    }
+
+    static Node mapping(Tag f, Node x) {
+        return Node{x.mn + f, x.len};
+    }
+
+    static Tag composition(Tag f, Tag g) {
+        return f + g;
+    }
+
+    static Tag id() {
+        return 0;
+    }
+    // -------------------------------------------------------
+
+    /**
+     * @brief 長方形の和集合の面積を計算する
+     * @param rects 長方形のリスト。各要素は {l, r, u, d} 半開区間 ( l < r && u < d )
+     */
+    static ll solve(const vector<array<ll, 4>>& rects) {
+        int n = rects.size();
+        if (n == 0) return 0;
+
+        // 平面走査イベントの定義
+        struct Event {
+            ll x;
+            int type; // 1: 追加, -1: 削除
+            ll y_l, y_u;
+            bool operator<(const Event& other) const {
+                return x < other.x;
+            }
+        };
+
+        vector<Event> events;
+        events.reserve(n * 2);
+        vector<ll> ys;
+        ys.reserve(n * 2);
+
+        for (const auto& r : rects) {
+            // r: {x1, x2, y1, y2}
+            events.push_back({r[0], 1, r[2], r[3]});
+            events.push_back({r[1], -1, r[2], r[3]});
+            ys.push_back(r[2]);
+            ys.push_back(r[3]);
+        }
+
+        sort(events.begin(), events.end());
+        
+        // Y座標の座圧
+        sort(ys.begin(), ys.end());
+        ys.erase(unique(ys.begin(), ys.end()), ys.end());
+
+        int m = ys.size() - 1;
+        if (m == 0) return 0;
+
+        // セグメント木の初期化
+        // 各葉ノードはY座標の区間 [ys[i], ys[i+1]) に対応
+        vector<Node> init_v(m);
+        for (int i = 0; i < m; ++i) {
+            init_v[i] = {0, ys[i+1] - ys[i]};
+        }
+
+        // 内部で定義した static 関数を指定してセグ木を構築
+        lazy_segtree<Node, op, e, Tag, mapping, composition, id> seg(init_v);
+
+        ll ans = 0;
+        ll total_width = ys.back() - ys.front();
+
+        for (int i = 0; i < events.size(); ++i) {
+            if (i > 0) {
+                ll dx = events[i].x - events[i-1].x;
+                Node s = seg.all_prod();
+                
+                // 最小被覆数が0の場合、有効な長さは (全体 - 0の長さ)
+                // 最小被覆数が1以上の場合、全体が有効
+                ll active_len = (s.mn == 0) ? (total_width - s.len) : total_width;
+                ans += dx * active_len;
+            }
+
+            // 区間更新
+            int idx_l = lower_bound(ys.begin(), ys.end(), events[i].y_l) - ys.begin();
+            int idx_r = lower_bound(ys.begin(), ys.end(), events[i].y_u) - ys.begin();
+            
+            if (idx_l < idx_r) {
+                seg.apply(idx_l, idx_r, events[i].type);
+            }
+        }
+
+        return ans;
+    }
+};

@@ -1,0 +1,123 @@
+/** https://atcoder.jp/contests/abc454/submissions/75098909
+ * DSU on Tree (Sack) - 1次元配列グラフ＋オイラーツアー爆速版
+ *
+ * 【概要】
+ * 木の部分木に関するオフラインクエリを O(N log N) で処理するアルゴリズム。
+ * 要素の追加・削除は容易だがマージが重いデータ構造（巨大な種類数カウントなど）を、
+ * 木全体で1つのグローバル状態を使い回すことで高速に計算する。
+ * この実装は、グラフの動的確保(vector<vector<int>>)を避け、オイラーツアー配列で
+ * 再帰呼び出しを排除しているため、定数倍が極めて軽い（実測 N=2.5*10^6 で2秒台）。
+ *
+ * 【使い方】
+ * 1. 木全体で共有する状態変数を用意する（例: cnt, col, mx, ans など）。
+ * 2. 以下の3つの関数（ラムダ式）を定義する。引数の v は頂点番号(0-indexed)。
+ * - auto add = [&](int v) { ... };   // 頂点 v の情報を状態に追加
+ * - auto del = [&](int v) { ... };   // 頂点 v の情報を状態から削除
+ * - auto query = [&](int v) { ... }; // 頂点 v のクエリの答えを記録
+ * 3. インスタンス化: DSUonTree dsu(N, add, del, query);
+ * 4. 辺の追加: dsu.add_edge(u, v); // 無向辺でOK。親子の向きは内部で自動判定される。
+ * 5. 実行: dsu.build(root); // root を根として計算開始（デフォルトは0）。
+ */
+
+template<class Add, class Del, class Query>
+struct DSUonTree {
+    int n;
+    
+    // CSR形式の1次元グラフ（無向グラフのため辺は 2*N 本）
+    vector<int> head, to, nxt;
+    int edge_cnt;
+    
+    // HLD / オイラーツアー用配列
+    vector<int> sz, heavy_child, in, out, rev;
+    int timer;
+
+    Add add;
+    Del del;
+    Query query;
+
+    DSUonTree(int n, Add add, Del del, Query query) 
+        : n(n), head(n, -1), to(2 * n), nxt(2 * n), edge_cnt(0),
+          sz(n, 1), heavy_child(n, -1), in(n), out(n), rev(n), timer(0),
+          add(add), del(del), query(query) {}
+
+    // 無向辺の追加
+    void add_edge(int u, int v) {
+        to[edge_cnt] = v; nxt[edge_cnt] = head[u]; head[u] = edge_cnt++;
+        to[edge_cnt] = u; nxt[edge_cnt] = head[v]; head[v] = edge_cnt++;
+    }
+
+    // 構築と計算の実行
+    void build(int root = 0) {
+        dfs_sz(root, -1);
+        dfs_hld(root, -1);
+        dfs_dsu(root, -1, true);
+    }
+
+private:
+    // 部分木サイズの計算と Heavy Child の決定
+    void dfs_sz(int v, int p) {
+        int max_sub = 0;
+        for (int e = head[v]; e != -1; e = nxt[e]) {
+            int u = to[e];
+            if (u == p) continue;
+            dfs_sz(u, v);
+            sz[v] += sz[u];
+            if (max_sub < sz[u]) {
+                max_sub = sz[u];
+                heavy_child[v] = u;
+            }
+        }
+    }
+
+    // 行きがけ順(in)と帰りがけ順(out)の記録
+    void dfs_hld(int v, int p) {
+        in[v] = timer++;
+        rev[in[v]] = v;
+        
+        // メモリの連続アクセス効率を上げるため Heavy Child を配列の直後に配置
+        if (heavy_child[v] != -1) dfs_hld(heavy_child[v], v);
+        
+        for (int e = head[v]; e != -1; e = nxt[e]) {
+            int u = to[e];
+            if (u == p || u == heavy_child[v]) continue;
+            dfs_hld(u, v);
+        }
+        out[v] = timer;
+    }
+
+    // DSU on Tree 本体
+    void dfs_dsu(int v, int p, bool keep) {
+        // 1. Light な子を処理し、状態を破棄する
+        for (int e = head[v]; e != -1; e = nxt[e]) {
+            int u = to[e];
+            if (u == p || u == heavy_child[v]) continue;
+            dfs_dsu(u, v, false);
+        }
+
+        // 2. Heavy な子を処理し、状態を保持する
+        if (heavy_child[v] != -1) {
+            dfs_dsu(heavy_child[v], v, true);
+        }
+
+        // 3. 今いる頂点 v と Light な子の部分木を状態に追加
+        add(v);
+        for (int e = head[v]; e != -1; e = nxt[e]) {
+            int u = to[e];
+            if (u == p || u == heavy_child[v]) continue;
+            // オイラーツアー配列を用いたループ展開（再帰呼び出しの排除）
+            for (int i = in[u]; i < out[u]; i++) {
+                add(rev[i]);
+            }
+        }
+
+        // 4. 部分木 v の状態が完成したのでクエリに答える
+        query(v);
+
+        // 5. 親から見て自分が Light な子であれば状態を破棄する
+        if (!keep) {
+            for (int i = in[v]; i < out[v]; i++) {
+                del(rev[i]);
+            }
+        }
+    }
+};

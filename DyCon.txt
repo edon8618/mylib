@@ -1,0 +1,206 @@
+// https://judge.yosupo.jp/submission/331268
+// UnionFindUndo: 成分ごとにモノイド S を保持し、unite/prod をロールバック可能にする
+template<typename S, S (*op)(const S, const S), S (*e)()>
+struct UnionFindUndo {
+    struct Action {
+        int type; // 0 = unite, 1 = prod, 2 = noop
+        // unite: a_root, prev_par_a, b_root, prev_par_b, prev_data_a
+        // prod: root, prev_data
+        int a_root, prev_par_a, b_root, prev_par_b;
+        S prev_data_a;
+        S prev_data_b; // prod では未使用
+    };
+
+    int n;
+    vector<int> par; // 根なら負の値
+    vector<S> data;  // 根ごとのモノイド積
+    vector<Action> actions;  // 操作履歴（ロールバック用）
+
+    UnionFindUndo(int n = 0, const vector<S>& init = {}) : n(n), par(n, -1), data(n, e()) {
+        if(!init.empty()){
+            for(int i=0;i<n;i++) data[i] = init[i];
+        }
+    }
+
+    int find(int x) const {
+        while(par[x] >= 0) x = par[x];
+        return x;
+    }
+
+    // unite (パス圧縮なし)
+    bool unite(int x, int y){
+        x = find(x); y = find(y);
+        if(x == y){
+            actions.push_back(Action{2,0,0,0,0,e(),e()});
+            return false;
+        }
+        if(-par[x] < -par[y]) swap(x,y);
+        // 現在の状態を記録
+        actions.push_back(Action{0, x, par[x], y, par[y], data[x], data[y]});
+        par[x] += par[y];
+        par[y] = x;
+        // 成分のモノイド値を合成
+        data[x] = op(data[x], data[y]);
+        return true;
+    }
+
+    // prod_value: 頂点 v を含む成分に対して val を合成する（data[root] := op(data[root], val)）
+    void prod_value(int v, const S &val){
+        int r = find(v);
+        actions.push_back(Action{1, r, 0, 0, 0, data[r], e()});
+        data[r] = op(data[r], val);
+    }
+
+
+    // チェックポイントまで巻き戻す（actions のサイズを checkpoint に戻す）
+    void rollback_to(size_t checkpoint){
+        while(actions.size() > checkpoint){
+            Action a = actions.back(); actions.pop_back();
+            if(a.type == 2) continue;
+            if(a.type == 0){
+                // unite の巻き戻し: par と data を復元
+                int xr = a.a_root, yr = a.b_root;
+                par[xr] = a.prev_par_a;
+                par[yr] = a.prev_par_b;
+                data[xr] = a.prev_data_a;
+                // data[yr] は unite 時に変更していないため復元不要
+            }else if(a.type == 1){
+                // prod の巻き戻し: 根のデータを復元
+                data[a.a_root] = a.prev_data_a;
+            }
+        }
+    }
+
+    size_t snapshot() const { return actions.size(); }
+
+    // 頂点 v が属する成分の現在のモノイド積を返す
+    S comp_value(int v) const {
+        int r = find(v);
+        return data[r];
+    }
+};
+
+
+// OfflineDynamicConnectivity の汎用版（モノイド S を扱える）
+// Entry.type == 0 : edge (u,v)
+// Entry.type == 1 : 頂点への寄与 (u, val)
+// 頂点への寄与は根の data を変更することで行う、そのため data[u]=op(data[u],x) はできるが, data[u]=x はできない
+template<typename S, S (*op)(const S, const S), S (*e)()>
+struct OfflineDynamicConnectivity {
+    struct Entry {
+        int type; // 0=edge,1=prod (頂点への寄与)
+        int u;
+        int v;    // for edge: v;       for prod: unused
+        S val;    // for edge: unused;  for prod: value
+        Entry(int t,int _u,int _v,const S &_val):type(t),u(_u),v(_v),val(_val){}
+    };
+
+    using UF = UnionFindUndo<S, op, e>;
+    UF &uf;
+    int Q;
+    int segsz;
+    vector<vector<Entry>> seg;
+    unordered_map<long long,int> cnt;
+    unordered_map<long long,int> appear;
+    vector<pair<pair<int,int>, pair<int,int>>> pend; // ((l,r),(u,v))
+
+    OfflineDynamicConnectivity(UF &uf_, int Q_): uf(uf_), Q(Q_) {
+        segsz = 1;
+        while(segsz < Q) segsz <<= 1;
+        seg.assign(2*segsz, {});
+        cnt.reserve(Q*2);
+        appear.reserve(Q*2);
+    }
+
+    static long long edge_key(int a,int b){
+        if(a>b) swap(a,b);
+        return ( (long long)a << 32 ) | (unsigned long long)b;
+    }
+
+    // 時刻 idx で辺 (u,v) が追加されたことを記録
+    void insert(int idx,int u,int v){
+        long long k = edge_key(u,v);
+        if(cnt[k]++ == 0) appear[k] = idx;
+    }
+
+    // 時刻 idx で辺 (u,v) が削除されたことを記録し、有効区間を pend に追加
+    // 辺の有効区間は [appear[k], idx)
+    void erase(int idx,int u,int v){
+        long long k = edge_key(u,v);
+        if(--cnt[k] == 0){
+            int st = appear[k];
+            pend.emplace_back(make_pair(make_pair(st, idx), make_pair(u,v)));
+            appear.erase(k);
+        }
+    }
+
+    // セグメント木のノード群に対して区間 [a,b) を覆うように Entry を登録する
+    void add_interval(int a,int b,const Entry &etr){
+        function<void(int,int,int)> add = [&](int k,int l,int r){
+            if(b <= l || r <= a) return;
+            if(a <= l && r <= b){
+                seg[k].push_back(etr);
+                return;
+            }
+            int m = (l+r)>>1;
+            add(2*k, l, m);
+            add(2*k+1, m, r);
+        };
+        add(1, 0, segsz);
+    }
+
+
+    void prod_vertex_interval(int a, int b, int v, const S &val){
+        add_interval(a, b, Entry(1, v, 0, val));
+    }
+
+    // 時刻 a から終端まで頂点 v に val を合成する便宜関数
+    void prod(int a, int v, const S &val){
+        prod_vertex_interval(a, Q, v, val);
+    }
+
+    // 構築: 現在残っている辺を [st,Q) として pend に追加し、すべてをセグ木へ登録する
+    void build(){
+        for(auto &kv : cnt){
+            if(kv.second > 0){
+                long long k = kv.first;
+                int st = appear[k];
+                int u = (int)(k >> 32);
+                int v = (int)(k & 0xffffffff);
+                pend.emplace_back(make_pair(make_pair(st, Q), make_pair(u,v)));
+            }
+        }
+        for(auto &p : pend){
+            int l = p.first.first;
+            int r = p.first.second;
+            int u = p.second.first;
+            int v = p.second.second;
+            add_interval(l, r, Entry(0, u, v, e()));
+        }
+    }
+
+    // セグメント木を DFS 走査して各ノードのエントリを適用 → 葉でクエリ処理 → 巻き戻し
+    void run(const function<void(int)> &f, int k = 1, int l = 0, int r = -1){
+        if(r == -1) r = segsz;
+        size_t cp = uf.snapshot();
+        for(auto &en : seg[k]){
+            if(en.type == 0){
+                uf.unite(en.u, en.v);
+            }else if(en.type == 1){
+                uf.prod_value(en.u, en.val);
+            }
+        }
+        if(l+1 == r){
+            if(l < Q) f(l); // 葉に対応する時刻の処理
+        }else{
+            int m = (l+r)>>1;
+            run(f, 2*k, l, m);
+            run(f, 2*k+1, m, r);
+        }
+        uf.rollback_to(cp);
+    }
+};
+
+struct S{};
+S op(const S a, const S b){}
+S e(){}

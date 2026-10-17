@@ -1,0 +1,234 @@
+/**https://atcoder.jp/contests/abc326/submissions/76493824
+ * @brief 燃やす埋める (Project Selection Problem)
+ * * 最小カット（最大流）を用いて、N個の変数を 0 (S側) か 1 (T側) のどちらかに
+ * 割り当て、以下の目的関数の総和を最小化するアルゴリズムです。
+ * * [最小化する目的関数]
+ * Σ (頂点 v を 0 にしたときの基本コスト)
+ * + Σ (頂点 v を 1 にしたときの基本コスト)
+ * + Σ (頂点 u を 0, 頂点 v を 1 にしたときのペナルティ)
+ * + Σ (u, v の 2 変数に対する劣モジュラなコスト行列)
+ * * [S側とT側の直感的な意味]
+ * - 0 (S側): グラフのカット後、Source(始点)側と繋がっている状態。
+ * 例: 「燃やす」「選ばない」「条件を満たさない」
+ * - 1 (T側): グラフのカット後、Sink(終点)側と繋がっている状態。
+ * 例: 「埋める」「選ぶ」「条件を満たす」
+ * * ※ 注意事項
+ * - ペナルティの重みは必ず非負 (w >= 0) である必要があります。
+ * - add_pair に渡すコスト行列は、劣モジュラ不等式 $C_{00} + C_{11} \le C_{01} + C_{10}$ 
+ * を満たす必要があります（揃えた方がコストが安い、あるいはペナルティが少ない状態）。
+ * - マイナスのコスト（報酬）が絡む場合は、内部でオフセットを加算し、
+ * 自動で正の容量を持つグラフに変換処理されます。
+ */
+template <class Cap>
+struct ProjectSelection {
+    int n;
+    int S, T;
+    mf_graph<Cap> graph;
+    Cap offset_cost;
+
+    ProjectSelection() : n(0), S(0), T(0), offset_cost(0) {}
+    // 頂点数 n で初期化。S=n, T=n+1 として構築。
+    ProjectSelection(int n) : n(n), S(n), T(n + 1), graph(n + 2), offset_cost(0) {}
+
+    /**
+     * @brief 頂点の基本コストを追加
+     * @param v 対象の頂点 (0-indexed)
+     * @param c0 0 (S側・燃やす) にしたときにかかるコスト
+     * @param c1 1 (T側・埋める) にしたときにかかるコスト
+     */
+    void add_node(int v, Cap c0, Cap c1) {
+        assert(0 <= v && v < n);
+        if (c0 < c1) {
+            graph.add_edge(S, v, c1 - c0); // 1にするための追加ペナルティ
+            offset_cost += c0;             // どちらにせよ最低限 c0 はかかる
+        } else {
+            graph.add_edge(v, T, c0 - c1); // 0にするための追加ペナルティ
+            offset_cost += c1;             // どちらにせよ最低限 c1 はかかる
+        }
+    }
+
+    /**
+     * @brief 0-1パターンのペナルティを追加
+     * @param u 0 (S側) になる頂点
+     * @param v 1 (T側) になる頂点
+     * @param w ペナルティのコスト (w >= 0)
+     */
+    void add_penalty_01(int u, int v, Cap w) {
+        assert(0 <= u && u < n && 0 <= v && v < n);
+        assert(w >= 0);
+        graph.add_edge(u, v, w);
+    }
+
+    /**
+     * @brief 1-0パターンのペナルティを追加
+     */
+    void add_penalty_10(int u, int v, Cap w) {
+        add_penalty_01(v, u, w);
+    }
+
+    /**
+     * @brief 2変数のコスト行列をそのまま追加 (最強メソッド)
+     * @details c00 + c11 <= c01 + c10 (劣モジュラ性) を満たす必要がある
+     */
+    void add_pair(int u, int v, Cap c00, Cap c01, Cap c10, Cap c11) {
+        assert(c00 + c11 <= c01 + c10); // 劣モジュラ性の確認
+        offset_cost += c00;
+        add_node(u, 0, c10 - c00);
+        add_node(v, 0, c11 - c10);
+        add_penalty_01(u, v, c01 + c10 - c00 - c11);
+    }
+
+    /**
+     * @brief 最小コストを計算
+     */
+    Cap solve() {
+        return graph.flow(S, T) + offset_cost;
+    }
+
+    /**
+     * @brief 最小コスト達成時の割り当てを復元
+     * @return vector<int> 各頂点が 0(S側) か 1(T側) かの配列
+     */
+    vector<int> get_assignment() {
+        vector<bool> cut = graph.min_cut(S);
+        vector<int> res(n);
+        for (int i = 0; i < n; ++i) {
+            res[i] = cut[i] ? 0 : 1;
+        }
+        return res;
+    }
+};
+
+
+
+/**https://atcoder.jp/contests/abc347/submissions/76575746
+ * @brief 多値の燃やす埋める (Multi-choice Project Selection)
+ * * N個の変数がそれぞれ 0 ~ K-1 のいずれかの値をとる場合のコスト最小化を行います。
+ * 内部で 2値の ProjectSelection を呼び出し、「変数 i の値は k 以上か？」という
+ * YES(1)/NO(0) の二値グラフに自動で帰着させて解きます。
+ * * [最小化する目的関数]
+ * Σ (変数 u を値 x にしたときの個別コスト C[u][x])
+ * + Σ (変数 u を値 x、変数 v を値 y にしたときのペアコスト M[x][y])
+ * * [必須制約: Monge性]
+ * add_binary_cost に渡すコスト行列 M は、必ず Monge性 を満たす必要があります。
+ * 数式: M[i][j] + M[i-1][j-1] <= M[i-1][j] + M[i][j-1]
+ * 直感的な意味: 差の絶対値 |x-y| や差の二乗 (x-y)^2 のように、
+ * 「値の差が広がるほどペナルティが大きくなる（凸関数）」コスト行列であれば解けます。
+ * * @par 使用例
+ * @code
+ * // N=3 の変数がそれぞれ 0~4 (5択) の値をとる場合
+ * ProjectSelectionMulti<ll> psp({5, 5, 5});
+ * * // 1変数の個別コストを追加
+ * vector<ll> c0 = {10, 5, 8, 2, 0}; // 0を選ぶと10、1を選ぶと5...
+ * psp.add_unary_cost(0, c0);
+ * * // 2変数間のペアコストを追加 (5x5のMonge行列 M を投げる)
+ * psp.add_binary_cost(0, 1, M);
+ * * // 最小コストの計算と、各変数が 0~4 のどれになったかの復元
+ * ll min_cost = psp.solve();
+ * vector<int> res = psp.get_assignment();
+ * @endcode
+ */
+template <class Cap>
+struct ProjectSelectionMulti {
+    int n;
+    vector<int> K;
+    vector<int> start_idx;
+    ProjectSelection<Cap> psp;
+    Cap INF_CAP;
+
+    /**
+     * @brief 初期化
+     * @param K_ 各変数の選択肢の数 (例: 全マス 5 択なら vector<int>(N, 5))
+     * @param inf_cap 絶対に選ばれないための無限大コスト (1e15 など)
+     */
+    ProjectSelectionMulti(const vector<int>& K_, Cap inf_cap = 1e15) 
+        : n(K_.size()), K(K_), INF_CAP(inf_cap) {
+        
+        int total_vars = 0;
+        start_idx.assign(n, 0);
+        for(int i = 0; i < n; ++i) {
+            start_idx[i] = total_vars;
+            total_vars += max(0, K[i] - 1);
+        }
+        psp = ProjectSelection<Cap>(total_vars);
+        
+        // 状態の矛盾を防ぐための ∞ 辺 (例: 「3以上」がYESなのに「2以上」がNOになるのはあり得ない)
+        for(int i = 0; i < n; ++i) {
+            for(int k = 1; k < K[i] - 1; ++k) {
+                // psp.add_penalty_01( 0(NO)になる頂点, 1(YES)になる頂点, 罰金 );
+                psp.add_penalty_01(idx(i, k), idx(i, k + 1), INF_CAP);
+            }
+        }
+    }
+
+    // 内部変数マッピング (変数 i が k 以上か？ を表す 2値ノードのインデックス)
+    int idx(int i, int k) {
+        assert(0 < k && k < K[i]);
+        return start_idx[i] + k - 1;
+    }
+
+    /**
+     * @brief 1変数の個別コストを追加
+     * @param u 対象の変数
+     * @param C 大きさ K[u] のコスト配列 (C[x] は 変数 u を x にした時のコスト)
+     */
+    void add_unary_cost(int u, const vector<Cap>& C) {
+        assert((int)C.size() == K[u]);
+        psp.offset_cost += C[0];
+        for(int x = 1; x < K[u]; ++x) {
+            // 前の選択肢との「差分」を 2値ライブラリの add_node に投げる魔法
+            psp.add_node(idx(u, x), 0, C[x] - C[x - 1]);
+        }
+    }
+
+    /**
+     * @brief 2変数間のペアコストを追加 (Monge行列であること)
+     * @param u, v 対象の変数
+     * @param M 大きさ K[u] × K[v] のコスト行列
+     */
+    void add_binary_cost(int u, int v, const vector<vector<Cap>>& M) {
+        assert((int)M.size() == K[u] && (int)M[0].size() == K[v]);
+        psp.offset_cost += M[0][0];
+        
+        for(int i = 1; i < K[u]; ++i) psp.add_node(idx(u, i), 0, M[i][0] - M[i - 1][0]);
+        for(int j = 1; j < K[v]; ++j) psp.add_node(idx(v, j), 0, M[0][j] - M[0][j - 1]);
+        
+        for(int i = 1; i < K[u]; ++i) {
+            for(int j = 1; j < K[v]; ++j) {
+                // 2x2部分の Monge 性を判定し、負の報酬を 1-1 ペアに付与する魔法
+                Cap delta = M[i][j] - M[i - 1][j] - M[i][j - 1] + M[i - 1][j - 1];
+                if (delta < 0) {
+                    psp.add_pair(idx(u, i), idx(v, j), 0, 0, 0, delta);
+                } else {
+                    assert(delta <= 0 && "Matrix must be Monge!");
+                }
+            }
+        }
+    }
+
+    Cap solve() {
+        return psp.solve();
+    }
+
+    /**
+     * @brief 最小コスト達成時の割り当てを復元
+     * @return vector<int> 各変数が 0 ~ K[i]-1 のどれに割り当てられたかの配列
+     */
+    vector<int> get_assignment() {
+        // 内部の2値ライブラリの割り当て結果 (0 or 1) を取得
+        vector<int> bin_res = psp.get_assignment();
+        vector<int> ans(n, 0);
+        
+        for (int i = 0; i < n; ++i) {
+            int val = 0;
+            // その変数に属する閾値ノード (k = 1 ~ K[i]-1) を調べる
+            for (int k = 1; k < K[i]; ++k) {
+                if (bin_res[idx(i, k)] == 1) {
+                    val++; // 1 (T側) になっているノードの数を数える
+                }
+            }
+            ans[i] = val;
+        }
+        return ans;
+    }
+};
