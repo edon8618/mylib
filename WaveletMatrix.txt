@@ -1,3 +1,4 @@
+
 /**
  * @brief 完備辞書 (Bit Vector)
  *
@@ -38,29 +39,7 @@ struct BitVector {
         return i - rank1(i);
     }
 
-    // k番目 (0-indexed) の 1 の位置 (存在しなければ -1)
-    int select1(int k) const {
-        if (k < 0 || rank1(n) <= k) return -1;
-        int l = 0, r = n;
-        while (r - l > 1) {
-            int m = (l + r) / 2;
-            if (rank1(m) >= k + 1) r = m;
-            else l = m;
-        }
-        return r - 1;
-    }
 
-    // k番目 (0-indexed) の 0 の位置 (存在しなければ -1)
-    int select0(int k) const {
-        if (k < 0 || rank0(n) <= k) return -1;
-        int l = 0, r = n;
-        while (r - l > 1) {
-            int m = (l + r) / 2;
-            if (rank0(m) >= k + 1) r = m;
-            else l = m;
-        }
-        return r - 1;
-    }
 };
 
 /** https://judge.yosupo.jp/submission/355222
@@ -243,7 +222,6 @@ struct CompressedWaveletMatrix {
 
     // 2. [l, r) のうち、値が x の要素数を返す
     int rank(int l, int r, T x) const {
-        if (x < 0 || ((std::make_unsigned_t<T>(x) >> (MAXLOG - 1)) >> 1) != 0) return 0;
         auto it = lower_bound(vals.begin(), vals.end(), x);
         if (it == vals.end() || *it != x) return 0;
         return wm.rank(l, r, it - vals.begin());
@@ -267,6 +245,7 @@ struct CompressedWaveletMatrix {
 
     // 6. [l, r) のうち、値が [lower, upper) に含まれる要素数を返す
     int range_freq(int l, int r, T lower, T upper) const {
+        if (l >= r || lower >= upper) return 0;
         return rank_less_than(l, r, upper) - rank_less_than(l, r, lower);
     }
 
