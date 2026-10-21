@@ -28,6 +28,9 @@
  * tree.build_edge(0, init_S_edges);
  */
 
+#pragma once
+#include <bits/stdc++.h>
+#include <atcoder/lazysegtree>
 template<
     class S, S (*op)(S, S), S (*e)(),
     class F, S (*mapping)(F, S), F (*composition)(F, F), F (*id)(),
@@ -163,41 +166,75 @@ struct HLD_Lazy {
     }
 
 private:
+    // Simulate dfs_sz exactly, including the original swaps inside g[v].
+    // The per-frame cursor pauses at a child until that child's DFS returns.
+    // This preserves the old recursion's g/in/out/head/rev ordering, even
+    // when multiple maximum-size children tie or the parent is g[v][0].
     void build_dfs(int root) {
+        assert(0 <= root && root < n);
+        assert((int)edges.size() == n - 1);
         timer = 0;
-        dfs_sz(root, -1, 0);
-        head[root] = root;
-        dfs_hld(root, -1);
-    }
+        std::fill(sz.begin(), sz.end(), 1);
+        std::fill(parent.begin(), parent.end(), -1);
+        std::fill(depth.begin(), depth.end(), 0);
 
-    // 各部分木のサイズ(sz)と深さ(depth)を計算し、最も重い子(Heavy Child)を決定する
-    void dfs_sz(int v, int p, int d) {
-        parent[v] = p;
-        depth[v] = d;
-        int max_sub = 0;
-        for (int& u : g[v]) {
-            if (u == p) continue;
-            dfs_sz(u, v, d + 1);
-            sz[v] += sz[u];
-            if (max_sub < sz[u]) {
-                max_sub = sz[u];
-                // g[v][0] に常に Heavy Child が来るように swap
-                std::swap(g[v][0], u); 
+        struct SizeFrame { int v, next, max_sub; };
+        std::vector<SizeFrame> stack;
+        stack.reserve(n);
+        stack.push_back({root, 0, 0});
+        while (!stack.empty()) {
+            int v = stack.back().v;
+            int i = stack.back().next;
+            if (i == (int)g[v].size()) {
+                stack.pop_back();
+                if (!stack.empty()) {
+                    auto& p = stack.back();
+                    int pv = p.v;
+                    int child_idx = p.next;
+                    // At this point the child's DFS has just returned.
+                    sz[pv] += sz[v];
+                    if (sz[v] > p.max_sub) {
+                        p.max_sub = sz[v];
+                        std::swap(g[pv][0], g[pv][child_idx]);
+                    }
+                    ++p.next;
+                }
+                continue;
             }
+            int u = g[v][i];
+            if (u == parent[v]) {
+                ++stack.back().next;
+                continue;
+            }
+            parent[u] = v;
+            depth[u] = depth[v] + 1;
+            stack.push_back({u, 0, 0});
         }
-    }
 
-    // Heavy Child を優先してDFSし、行きがけ順(in)と帰りがけ順(out)を記録する
-    void dfs_hld(int v, int p) {
-        in[v] = timer++;
-        rev[in[v]] = v;
-        for (int u : g[v]) {
-            if (u == p) continue;
-            // Heavy Child なら親と同じパス(head)、Light Child なら新しいパスの始点
-            head[u] = (u == g[v][0] ? head[v] : u);
-            dfs_hld(u, v);
+        // Simulate dfs_hld's recursive preorder using the already-swapped g.
+        struct HldFrame { int v, next; };
+        std::vector<HldFrame> frames;
+        frames.reserve(n);
+        head[root] = root;
+        in[root] = timer;
+        rev[timer++] = root;
+        frames.push_back({root, 0});
+        while (!frames.empty()) {
+            int v = frames.back().v;
+            int i = frames.back().next++;
+            if (i == (int)g[v].size()) {
+                out[v] = timer;
+                frames.pop_back();
+                continue;
+            }
+            int u = g[v][i];
+            if (u == parent[v]) continue;
+            head[u] = u == g[v][0] ? head[v] : u;
+            in[u] = timer;
+            rev[timer++] = u;
+            frames.push_back({u, 0});
         }
-        out[v] = timer; // out[v] は部分木クエリ用の右端インデックス
+        assert(timer == n);
     }
 };
 
