@@ -1,0 +1,57 @@
+#pragma once
+#include <vector>
+#include <array>
+#include <algorithm>
+
+template <class T = int>
+struct Dice {
+    // 0: Top, 1: Front, 2: Right, 3: Left, 4: Back, 5: Bottom
+    std::array<T, 6> val;
+
+    Dice() { val.fill(0); }
+    Dice(const std::array<T, 6>& v) : val(v) {}
+
+    // 指定したインデックスの値を返す（可読性用）
+    T top() const { return val[0]; }
+    T bottom() const { return val[5]; }
+
+    // 北（奥）へ転がす
+    void roll_N() { roll(0, 1, 5, 4); }
+    // 南（手前）へ転がす
+    void roll_S() { roll(0, 4, 5, 1); }
+    // 東（右）へ転がす
+    void roll_E() { roll(0, 3, 5, 2); }
+    // 西（左）へ転がす
+    void roll_W() { roll(0, 2, 5, 3); }
+    // 右回転（上面・底面を固定して時計回り）
+    void roll_R() { roll(1, 2, 4, 3); }
+    // 左回転（反時計回り）
+    void roll_L() { roll(1, 3, 4, 2); }
+
+    // 全24通りの回転状態を生成する（同値判定などに必須）
+    std::vector<Dice> get_all_rotations() const {
+        std::vector<Dice> res;
+        Dice d = *this;
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 4; j++) {
+                res.push_back(d);
+                d.roll_R();
+            }
+            if (i % 2 == 0) d.roll_N();
+            else d.roll_E();
+        }
+        return res;
+    }
+
+    // --- 演算子のオーバーロード（setやmapに入れる用） ---
+    bool operator==(const Dice& rhs) const { return val == rhs.val; }
+    bool operator!=(const Dice& rhs) const { return val != rhs.val; }
+    bool operator<(const Dice& rhs) const { return val < rhs.val; }
+
+private:
+    // 4つの面を巡回シフトするヘルパー関数
+    void roll(int a, int b, int c, int d) {
+        T tmp = val[a];
+        val[a] = val[b]; val[b] = val[c]; val[c] = val[d]; val[d] = tmp;
+    }
+};

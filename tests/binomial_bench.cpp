@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
 using namespace std;
-#include "../ArbitraryModBinomial.txt"
+#include "../ArbitraryModBinomial.hpp"
 #ifdef BINOMIAL_BENCH_COMPARE
 namespace original {
 #include "bench_reference/binomial_original.hpp"

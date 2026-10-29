@@ -1,0 +1,124 @@
+#pragma once
+/**https://judge.yosupo.jp/submission/345877
+ * T=ll  N, Q <= 2*10^5   802 ms  95.36 Mib
+ **https://judge.yosupo.jp/submission/345878
+ * T=double は誤差ありでいいなら T=ll とほぼ同じ
+ * 
+ * @brief Li Chao Tree (Static, 座標圧縮対応版)
+ * @details 直線の集合 S = { f(x) = mx + c } に対する点評価クエリを処理する
+ * 最大値クエリ max_{f in S} f(x) を求める (最小値の場合は m, c, 戻り値を反転する)
+ * * @tparam T 座標や値の型 (long long, double 等)
+ * * @note 【重要】事前にクエリで飛んでくる全ての x 座標を vector<T> でコンストラクタに渡す必要がある (Static版)
+ * * [Usage]
+ * vector<T> coords; // クエリで来るx座標を全部入れる
+ * LiChaoTree<T> slct(coords, -4e18); // 初期化 (座標集合, 単位元(-inf))
+ * slct.add_segment(m, c, l, r) // 区間 [l, r) に y = mx + c 追加
+ * slct.add_line(m, c); // 直線 y = mx + c を追加: O(log N)
+ * T val = slct.query(x); // x における最大値を取得: O(log N)
+ */
+template<typename T>
+struct StaticLiChaoTree {
+    struct Line {
+        T m, c;
+        T eval(T x) const { return m * x + c; }
+    };
+
+    int n;
+    const T INF_VAL;
+    vector<Line> tree;
+    vector<T> xs; // 座標圧縮用
+
+    // 許容誤差
+    const T EPS = is_floating_point<T>::value ? 1e-9 : 0;
+
+    StaticLiChaoTree(vector<T> coordinates, T inf_val) : INF_VAL(inf_val) {
+        if (coordinates.empty()) coordinates.push_back(T(0));
+        sort(coordinates.begin(), coordinates.end());
+        
+        // EPS考慮の重複削除
+        xs.push_back(coordinates[0]);
+        for(size_t i = 1; i < coordinates.size(); ++i) {
+            if (coordinates[i] > xs.back() + EPS) {
+                xs.push_back(coordinates[i]);
+            }
+        }
+
+        n = xs.size();
+        tree.assign(4 * n, {T(0), INF_VAL}); 
+    }
+
+    // 線分追加: 区間 [l, r) に y = mx + c を追加
+    // l, r は実際の座標値
+    void add_segment(T m, T c, T l, T r) {
+        if (l >= r) return;
+        
+        // 座標圧縮後のインデックスに変換
+        // l は「以上」の最初の点、r は「未満」の境界なので r も lower_bound でOK
+        auto it_l = lower_bound(xs.begin(), xs.end(), l - EPS);
+        auto it_r = lower_bound(xs.begin(), xs.end(), r - EPS);
+
+        int l_idx = distance(xs.begin(), it_l);
+        int r_idx = distance(xs.begin(), it_r);
+
+        Line new_line = {m, c};
+        _add_segment(new_line, l_idx, r_idx, 0, 0, n - 1);
+    }
+
+    // 全区間直線追加 (add_segment のラッパー)
+    void add_line(T m, T c) {
+        Line new_line = {m, c};
+        _add_line(new_line, 0, 0, n - 1);
+    }
+
+    T query(T x) {
+        if (n == 0 || x < xs.front() - EPS || x > xs.back() + EPS) return INF_VAL;
+
+        auto it = lower_bound(xs.begin(), xs.end(), x);
+        int idx = -1;
+
+        if (it != xs.end() && abs(*it - x) <= EPS) {
+            idx = distance(xs.begin(), it);
+        } 
+        else if (it != xs.begin() && abs(*prev(it) - x) <= EPS) {
+            idx = distance(xs.begin(), prev(it));
+        }
+
+        if (idx == -1) return INF_VAL;
+
+        return _query(idx, 0, 0, n - 1);
+    }
+
+private:
+    // 線分追加用の再帰関数
+    // [a, b): 目的の区間(index), [l, r]: 現在のノードの区間(index)
+    void _add_segment(Line new_line, int a, int b, int k, int l, int r) {
+        if (r < a || b <= l) return; // 範囲外
+        if (a <= l && r < b) {       // 完全に含む -> このノードに直線として追加
+            _add_line(new_line, k, l, r);
+            return;
+        }
+        int mid = (l + r) / 2;
+        _add_segment(new_line, a, b, 2 * k + 1, l, mid);
+        _add_segment(new_line, a, b, 2 * k + 2, mid + 1, r);
+    }
+
+    // 通常の Li Chao Tree の追加ロジック
+    void _add_line(Line new_line, int k, int l, int r) {
+        int mid = (l + r) / 2;
+        T lx = xs[l], mx = xs[mid], rx = xs[r];
+        bool left_better = new_line.eval(lx) > tree[k].eval(lx);
+        bool mid_better = new_line.eval(mx) > tree[k].eval(mx);
+        if (mid_better) swap(tree[k], new_line);
+        if (l == r) return;
+        if (left_better != mid_better) _add_line(new_line, 2 * k + 1, l, mid);
+        else _add_line(new_line, 2 * k + 2, mid + 1, r);
+    }
+
+    T _query(int x_idx, int k, int l, int r) {
+        T val = tree[k].eval(xs[x_idx]);
+        if (l == r) return val;
+        int mid = (l + r) / 2;
+        if (x_idx <= mid) return max(val, _query(x_idx, 2 * k + 1, l, mid));
+        else return max(val, _query(x_idx, 2 * k + 2, mid + 1, r));
+    }
+};

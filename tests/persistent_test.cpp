@@ -5,7 +5,7 @@ ll sop(ll x,ll y){return x+y;}
 ll se(){return 0;}
 string cop(string a,string b){return a+b;}
 string ce(){return "";}
-#include "../persistant_segtree.txt"
+#include "../persistant_segtree.hpp"
 bool threshold_nonzero(ll x){return x<=100000;}
 int main(){
  mt19937 rng(128759);

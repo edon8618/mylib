@@ -1,0 +1,296 @@
+#pragma once
+// https://atcoder.jp/contests/abc314/submissions/73171689
+// シンプルなテンプレート AVL 木（multiset 互換の最小実装）
+// - T: キーの型
+// - Comp: 比較関数（デフォルト less<T>）これで中身は昇順に並ぶ
+// 提供する主なメソッド:
+//  insert(const T& key) -> int (挿入位置の index)
+//  erase(const T& key)  -> int (削除した index、存在しなければ -1)
+//  erase_all(const T& key) -> int (削除した個数)
+//  contains(const T& key) -> bool
+//  lower_bound(const T& key) -> Iterator (最小の >= key の index)
+//  upper_bound(const T& key) -> Iterator (最小の >  key の index)
+//  at(int k) -> optional<T> (0-indexed k-th 要素)
+//  rank(const T& key) -> number of elements < key
+//  size(), empty(), to_vector()
+template <typename T, typename Comp = std::less<T>>
+struct AVLtree {
+    struct Node {
+        T key;
+        Node *l = nullptr, *r = nullptr, *p = nullptr;
+        int height = 1;
+        int sz = 1;
+        Node(const T& k): key(k) {}
+    };
+
+    Node* root = nullptr;
+    Comp comp;
+
+    AVLtree() = default;
+    AVLtree(const AVLtree&) = delete;
+    AVLtree& operator=(const AVLtree&) = delete;
+    AVLtree(AVLtree&& rhs) noexcept(std::is_nothrow_move_constructible_v<Comp>)
+        : root(nullptr), comp(std::move(rhs.comp)) { root = std::exchange(rhs.root, nullptr); }
+    AVLtree& operator=(AVLtree&& rhs) noexcept(std::is_nothrow_move_assignable_v<Comp>) {
+        if (this != &rhs) { comp = std::move(rhs.comp); clear(); root = std::exchange(rhs.root, nullptr); }
+        return *this;
+    }
+    ~AVLtree(){ clear(); }
+
+    void clear(){ destroy(root); root = nullptr; }
+
+    int size() const { return root ? root->sz : 0; }
+    bool empty() const { return root == nullptr; }
+
+    // --- utilities ---
+    static int height(Node* x){ return x ? x->height : 0; }
+    static int sz(Node* x){ return x ? x->sz : 0; }
+    static void update(Node* x){
+        if(!x) return;
+        x->height = 1 + max(height(x->l), height(x->r));
+        x->sz = 1 + sz(x->l) + sz(x->r);
+        if(x->l) x->l->p = x;
+        if(x->r) x->r->p = x;
+    }
+    static int bf(Node* x){ return x ? height(x->l) - height(x->r) : 0; }
+
+    Node* rotate_right(Node* y){
+        Node* x = y->l;
+        Node* b = x->r;
+        x->r = y; y->l = b;
+        if(b) b->p = y;
+        x->p = y->p; y->p = x;
+        update(y); update(x);
+        return x;
+    }
+    Node* rotate_left(Node* x){
+        Node* y = x->r;
+        Node* b = y->l;
+        y->l = x; x->r = b;
+        if(b) b->p = x;
+        y->p = x->p; x->p = y;
+        update(x); update(y);
+        return y;
+    }
+
+    // rebalance subtree rooted at x, returns new root of this subtree
+    Node* rebalance(Node* x){
+        update(x);
+        int balance = bf(x);
+        if(balance > 1){
+            if(bf(x->l) < 0) x->l = rotate_left(x->l);
+            return rotate_right(x);
+        }else if(balance < -1){
+            if(bf(x->r) > 0) x->r = rotate_right(x->r);
+            return rotate_left(x);
+        }
+        return x;
+    }
+
+    // recursive insert helper, duplicates allowed (insert into right subtree)
+    pair<Node*, bool> insert_node(Node* node, const T& key){
+        if(!node) return { new Node(key), true };
+        if(comp(key, node->key)){
+            auto pr = insert_node(node->l, key);
+            node->l = pr.first; if(node->l) node->l->p = node;
+        }else{
+            // duplicates also go to right subtree -> multiset 挙動
+            auto pr = insert_node(node->r, key);
+            node->r = pr.first; if(node->r) node->r->p = node;
+        }
+        node = rebalance(node);
+        return { node, true };
+    }
+
+    // insert: always inserts (returns index)
+    int insert(const T& key){
+        int idx = rank(key);
+        auto pr = insert_node(root, key);
+        root = pr.first;
+        if(root) root->p = nullptr;
+        return idx;
+    }
+
+    // find min in subtree
+    static Node* find_min(Node* x){ while(x && x->l) x = x->l; return x; }
+    static Node* find_max(Node* x){ while(x && x->r) x = x->r; return x; }
+
+    // erase by index (0-indexed), returns new subtree root and whether erased
+    pair<Node*, bool> erase_kth(Node* node, int k){
+        if(!node) return { nullptr, false };
+        int lsz = sz(node->l);
+        if(k < lsz){
+            auto pr = erase_kth(node->l, k);
+            node->l = pr.first; if(node->l) node->l->p = node;
+            node = rebalance(node);
+            return { node, pr.second };
+        }
+        if(k > lsz){
+            auto pr = erase_kth(node->r, k - lsz - 1);
+            node->r = pr.first; if(node->r) node->r->p = node;
+            node = rebalance(node);
+            return { node, pr.second };
+        }
+        // k == lsz -> delete this node
+        if(!node->l || !node->r){
+            Node* tmp = node->l ? node->l : node->r;
+            if(tmp) tmp->p = node->p;
+            delete node;
+            return { tmp, true };
+        }
+        // two children: replace with successor (min in right subtree)
+        Node* succ = find_min(node->r);
+        node->key = succ->key;
+        auto pr = erase_kth(node->r, 0);
+        node->r = pr.first; if(node->r) node->r->p = node;
+        node = rebalance(node);
+        return { node, true };
+    }
+
+    // erase a single occurrence; return erased index, or -1 if not found
+    int erase(const T& key){
+        int idx = lower_bound(key).index();
+        if(idx >= size()) return -1;
+        auto o = at(idx);
+        if(!o || comp(key, *o) || comp(*o, key)) return -1;
+        auto pr = erase_kth(root, idx);
+        root = pr.first;
+        if(root) root->p = nullptr;
+        return pr.second ? idx : -1;
+    }
+
+    // erase all occurrences of key, return number removed
+    int erase_all(const T& key){
+        int cnt = 0;
+        while(true){
+            int idx = erase(key);
+            if(idx == -1) break;
+            ++cnt;
+        }
+        return cnt;
+    }
+
+    bool contains(const T& key) const {
+        Node* cur = root;
+        while(cur){
+            if(comp(key, cur->key)) cur = cur->l;
+            else if(comp(cur->key, key)) cur = cur->r;
+            else return true;
+        }
+        return false;
+    }
+
+    // count occurrences of key
+    int count(const T& key) const {
+        // number of elements < key  と  < upper_bound の差で求める
+        int lo = rank(key);
+        int hi = upper_bound(key).index();
+        return hi - lo;
+    }
+
+    // k-th (0-indexed). return optional
+    optional<T> at(int k) const {
+        if(k < 0 || k >= size()) return nullopt;
+        Node* cur = root;
+        while(cur){
+            int lsz = sz(cur->l);
+            if(k < lsz) cur = cur->l;
+            else if(k == lsz) return cur->key;
+            else { k -= lsz + 1; cur = cur->r; }
+        }
+        return nullopt;
+    }
+
+    // number of elements strictly less than key
+    int rank(const T& key) const {
+        int r = 0;
+        Node* cur = root;
+        while(cur){
+            if(comp(key, cur->key)){
+                cur = cur->l;
+            }else{
+                if(!comp(cur->key, key)) { // cur->key >= key
+                    cur = cur->l;
+                } else {
+                    r += 1 + sz(cur->l);
+                    cur = cur->r;
+                }
+            }
+        }
+        return r;
+    }
+
+    // --- iterator-like interface (index-based iterator) ---
+    struct Iterator {
+        const AVLtree* tree = nullptr;
+        int idx = 0; // 0..size()
+        Iterator() = default;
+        Iterator(const AVLtree* t, int i): tree(t), idx(i) {}
+        T operator*() const {
+            auto o = tree->at(idx);
+            return *o; // assume valid
+        }
+        Iterator& operator++(){ ++idx; return *this; } // prefix
+        Iterator& operator--(){ --idx; return *this; } // prefix
+        Iterator& operator+=(int k){ idx += k; return *this; }
+        Iterator& operator-=(int k){ idx -= k; return *this; }
+        Iterator operator+(int k) const { return Iterator(tree, idx + k); }
+        Iterator operator-(int k) const { return Iterator(tree, idx - k); }
+        int index() const { return idx; }
+        bool valid() const { return tree && idx >= 0 && idx < tree->size(); }
+    };
+
+    // lower_bound: returns iterator to first element >= key (index)
+    Iterator lower_bound(const T& key) const {
+        int idx = 0;
+        Node* cur = root;
+        int ans = size();
+        while(cur){
+            if(!comp(cur->key, key)){ // cur->key >= key
+                ans = idx + sz(cur->l);
+                cur = cur->l;
+            }else{
+                idx += 1 + sz(cur->l);
+                cur = cur->r;
+            }
+        }
+        return Iterator(this, ans);
+    }
+    // upper_bound: returns iterator to first element > key (index)
+    Iterator upper_bound(const T& key) const {
+        int idx = 0;
+        Node* cur = root;
+        int ans = size();
+        while(cur){
+            if(comp(key, cur->key)){ // key < cur->key
+                ans = idx + sz(cur->l);
+                cur = cur->l;
+            } else {
+                idx += 1 + sz(cur->l);
+                cur = cur->r;
+            }
+        }
+        return Iterator(this, ans);
+    }
+
+    // inorder to vector
+    void inorder(Node* t, vector<T>& out) const {
+        if(!t) return;
+        inorder(t->l, out);
+        out.push_back(t->key);
+        inorder(t->r, out);
+    }
+    vector<T> to_vector() const {
+        vector<T> v; v.reserve(size());
+        inorder(root, v);
+        return v;
+    }
+
+private:
+    void destroy(Node* t){
+        if(!t) return;
+        destroy(t->l);
+        destroy(t->r);
+        delete t;
+    }
+};

@@ -1,0 +1,153 @@
+#pragma once
+/**https://codeforces.com/contest/2225/submission/372125686
+ * @brief SALCPRMQ (Suffix Array + LCP + O(1) RMQ)
+ * @details 
+ * Suffix ArrayとLCP配列を用いて、文字列の任意の部分文字列の辞書順比較や
+ * 最長共通接頭辞(LCP)を O(1) で求めるための競技プログラミング用ライブラリ。
+ * * [Template Type `T_string`]
+ * std::string のほか、座標圧縮済みの std::vector<int> や std::vector<long long> なども受付可能。
+ * 複数文字列を扱う場合は、他に出現しない番兵(例: -1 や '$')で連結して vector等 で渡すと良い。
+ * * [Time Complexity]
+ * - 構築 (Constructor): O(N log N) ※内部のSparse Table構築に起因
+ * - 空間計算量: O(N log N)
+ * * [Methods & Complexity]
+ * - get_lcp(i, j): O(1)
+ * 元の配列のインデックス i から始まる接尾辞と、j から始まる接尾辞の LCP(最長共通接頭辞)の長さを返す。
+ * - compare_substr(l1, r1, l2, r2): O(1)
+ * 部分文字列 S[l1...r1-1] と S[l2...r2-1] の辞書順比較を行う。
+ * 戻り値: -1 (S1 < S2), 0 (S1 == S2), 1 (S1 > S2)
+ * - lower_bound(T), upper_bound(T): O(|T| log N)
+ * 検索パターン T がSA上で現れる区間 [L, R) を二分探索で求める。
+ * - count_occurences(T): O(|T| log N)
+ * 検索パターン T の元の配列内での出現回数を返す。
+ */
+#include "atcoder/string"
+template <typename T_string>
+struct SALCPRMQ {
+    int n;
+    T_string S;
+    std::vector<int> sa, isa, lcp;
+    
+    // 内部にベタ書きした O(1) RMQ (Sparse Table)
+    struct SparseTable {
+        std::vector<std::vector<int>> st;
+        std::vector<int> lookup;
+        
+        SparseTable() {}
+        SparseTable(const std::vector<int>& v) {
+            int b = 0;
+            while ((1 << b) <= (int)v.size()) b++;
+            st.assign(b, std::vector<int>(v.size()));
+            for (int i = 0; i < (int)v.size(); i++) st[0][i] = v[i];
+            for (int i = 1; i < b; i++) {
+                for (int j = 0; j + (1 << i) <= (int)v.size(); j++) {
+                    st[i][j] = std::min(st[i - 1][j], st[i - 1][j + (1 << (i - 1))]);
+                }
+            }
+            lookup.resize(v.size() + 1);
+            for (int i = 2; i < (int)lookup.size(); i++) {
+                lookup[i] = lookup[i >> 1] + 1;
+            }
+        }
+        
+        inline int query(int l, int r) {
+            if (l >= r) return 1e9; // 異常値
+            int b = lookup[r - l];
+            return std::min(st[b][l], st[b][r - (1 << b)]);
+        }
+    } st;
+
+    // コンストラクタ (std::string や std::vector<int> を受け取る)
+    SALCPRMQ(const T_string& S_) : S(S_), n(S_.size()) {
+        // 1. SA構築 (ACLを使用)
+        sa = atcoder::suffix_array(S);
+        
+        // 2. ISA (Inverse Suffix Array) 構築
+        isa.resize(n);
+        for (int i = 0; i < n; i++) {
+            isa[sa[i]] = i;
+        }
+        
+        // 3. LCP Array構築 (ACLを使用)
+        lcp = atcoder::lcp_array(S, sa);
+        
+        // 4. Sparse Table構築
+        st = SparseTable(lcp);
+    }
+
+    // 元の配列の index i, j から始まる接尾辞のLCP長を O(1) で取得
+    inline int get_lcp(int i, int j) {
+        if (i == j) return n - i;
+        int l = isa[i], r = isa[j];
+        if (l > r) std::swap(l, r);
+        return st.query(l, r); // 半開区間 [l, r) の最小値
+    }
+
+    // S[l1..r1-1] と S[l2..r2-1] の辞書順比較を O(1) で行う
+    // 戻り値: -1 (S1 < S2), 0 (S1 == S2), 1 (S1 > S2)
+    inline int compare_substr(int l1, int r1, int l2, int r2) {
+        int len1 = r1 - l1;
+        int len2 = r2 - l2;
+        int lcp_len = get_lcp(l1, l2);
+        
+        // どちらかの終端に達した場合、長さの大小が辞書順の大小になる
+        if (lcp_len >= len1 || lcp_len >= len2) {
+            if (len1 < len2) return -1;
+            if (len1 > len2) return 1;
+            return 0; // 長さも同じなら完全に一致
+        }
+        
+        // 終端に達する前に異なる文字が出現した場合、その文字を比較
+        return S[l1 + lcp_len] < S[l2 + lcp_len] ? -1 : 1;
+    }
+
+    // 検索パターン T が最初に現れる SA上のインデックスを取得 O(|T| log N)
+    template <typename T_pattern>
+    int lower_bound(const T_pattern& T) {
+        int l = 0, r = n;
+        while (l < r) {
+            int mid = l + (r - l) / 2;
+            int S_idx = sa[mid];
+            bool is_less = true;
+            for (int i = 0; i < (int)T.size(); i++) {
+                if (S_idx + i >= n) { is_less = true; break; }
+                if (S[S_idx + i] != T[i]) {
+                    is_less = S[S_idx + i] < T[i];
+                    break;
+                }
+                if (i == (int)T.size() - 1) is_less = false; // 前方一致した場合は T 以下ではない
+            }
+            if (is_less) l = mid + 1;
+            else r = mid;
+        }
+        return l;
+    }
+
+    // 検索パターン T より真に大きい文字列が最初に現れる SA上のインデックスを取得 O(|T| log N)
+    template <typename T_pattern>
+    int upper_bound(const T_pattern& T) {
+        int l = 0, r = n;
+        while (l < r) {
+            int mid = l + (r - l) / 2;
+            int S_idx = sa[mid];
+            bool is_less_or_equal = true;
+            for (int i = 0; i < (int)T.size(); i++) {
+                if (S_idx + i >= n) { is_less_or_equal = true; break; }
+                if (S[S_idx + i] != T[i]) {
+                    is_less_or_equal = S[S_idx + i] < T[i];
+                    break;
+                }
+                if (i == (int)T.size() - 1) is_less_or_equal = true; // 前方一致した場合は T 以下とみなす
+            }
+            if (is_less_or_equal) l = mid + 1;
+            else r = mid;
+        }
+        return l;
+    }
+
+    // 検索パターン T の出現回数を取得 O(|T| log N)
+    template <typename T_pattern>
+    int count_occurences(const T_pattern& T) {
+        return upper_bound(T) - lower_bound(T);
+    }
+};

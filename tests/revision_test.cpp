@@ -7,25 +7,25 @@ using namespace std;using ll=long long;
 #ifdef HAVE_BOOST
 using boost::multiprecision::cpp_int;
 #endif
-#include "../WaveletMatrix.txt"
-#include "../binarytrie.txt"
-#include "../AVLtree.txt"
-#include "../ArbitraryModBinomial.txt"
-#include "../CRT.txt"
-#include "../floor ceil.txt"
-#include "../Diophantine.txt"
-#include "../DynamicLiChaoTree.txt"
+#include "../WaveletMatrix.hpp"
+#include "../binarytrie.hpp"
+#include "../AVLtree.hpp"
+#include "../ArbitraryModBinomial.hpp"
+#include "../CRT.hpp"
+#include "../floor ceil.hpp"
+#include "../Diophantine.hpp"
+#include "../DynamicLiChaoTree.hpp"
 #include "../Tree/Tree.txt"
-#include "../number-theory.txt"
+#include "../number-theory.hpp"
 #include "../geometoric/geo_real.hpp"
 namespace lca_euler {
-#include "../LCA eulor tour + sparse table.txt"
+#include "../LCA eulor tour + sparse table.hpp"
 }
 namespace lca_doubling {
-#include "../LCA ダブリング.txt"
+#include "../LCA ダブリング.hpp"
 }
 namespace treap_lib {
-#include "../implicit_treap.txt"
+#include "../implicit_treap.hpp"
 }
 struct TS {ll sum,len;bool operator==(const TS&b)const{return sum==b.sum&&len==b.len;}};
 TS top(TS a,TS b){return {a.sum+b.sum,a.len+b.len};}TS te(){return {0,0};}TS tmap(ll f,TS a){return {a.sum+f*a.len,a.len};}ll tc(ll a,ll b){return a+b;}ll ti(){return 0;}TS tr(TS a){return a;}
