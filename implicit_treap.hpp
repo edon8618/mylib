@@ -218,19 +218,3 @@ struct implicit_treap {
         return v;
     }
 };
-
-struct S{};
-
-struct F{};
-
-S op(S l,S r){}
-
-S e(){}
-
-S mapping(F f,S s){}
-
-F id(){}
-
-F composition(F f,F g){}
-
-S rev_op(S s){}

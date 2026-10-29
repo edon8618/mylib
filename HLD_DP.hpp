@@ -164,12 +164,3 @@ struct HeavyLightDP {
         return dp_data[root];
     }
 };
-
-struct S{};
-struct F{};
-
-F mergelight(ll v,vector<S> &ss){}
-
-F mergepath(F f,F g){}
-
-S eval(F f){}

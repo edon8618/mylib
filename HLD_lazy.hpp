@@ -236,13 +236,3 @@ private:
         assert(timer == n);
     }
 };
-
-struct S{};
-struct F{};
-S op(S l,S r){}
-S e(){}
-
-S mapping(F f,S s){}
-F comp(F f,F g){}
-F id(){}
-S rev_op(S s){}

@@ -201,7 +201,3 @@ struct OfflineDynamicConnectivity {
         uf.rollback_to(cp);
     }
 };
-
-struct S{};
-S op(const S a, const S b){}
-S e(){}

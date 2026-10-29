@@ -57,11 +57,3 @@ struct Matrix {
         return res;
     }
 };
-
-struct Semiring {
-    using T = mint; // modint998244353 などに変えるだけ
-    static T add(T a, T b) { return a+b; }
-    static T mul(T a, T b) { return a*b; }
-    static T zero() { return 0; }// addの単位元
-    static T one() { return 1; }// mulの単位元
-};
