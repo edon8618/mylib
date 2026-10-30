@@ -1,0 +1,36 @@
+RectangleUnion: 長方形の和集合面積
+対象: RectangleUnion.hpp / C++20
+
+【概要】
+軸平行長方形を平面走査し、重複部分を一度だけ数える。
+
+【テンプレート引数】
+なし。全座標・長さ・面積はll。
+
+【公開API】
+static ll RectangleUnion::solve(const vector<array<ll,4>>& rects)。
+各長方形は {x1,x2,y1,y2}、[x1,x2)×[y1,y2)。空配列は0。
+
+【計算量】
+長方形数Nに対して時間 O(Nlog(N+1))、空間 O(N)。
+
+【注意点】
+x1<x2,y1<y2の正の面積の長方形を渡す。差・積・面積の総和をllに収める。
+コメントのu/dの名称に依らず、3番目がy下端、4番目がy上端。
+
+【内部実装用】
+Node/Tag/op/e/mapping/composition/id は内部セグ木用（言語上public）。
+利用者が同名のグローバル関数を定義しても衝突しない。
+
+【依存関係】
+tmp.cpp の ll、標準ライブラリ、ACL lazy_segtree と using namespace atcoder（tmp.cppに含まれる）。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/RectangleUnion.hpp"
+void solve(){
+    vector<array<ll,4>> rects = {{0,2,0,2},{1,3,1,3}};
+    assert(RectangleUnion::solve(rects) == 7);
+    cout << RectangleUnion::solve(rects) << '\n';
+}
+--- C++20 ここまで ---

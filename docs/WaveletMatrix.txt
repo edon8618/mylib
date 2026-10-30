@@ -1,0 +1,55 @@
+WaveletMatrix / CompressedWaveletMatrix / RangeDistinctQuery
+対象: WaveletMatrix.hpp / C++20
+
+【概要】
+静的配列に対する区間順位・値域個数・前後値検索。座圧版と区間種類数も同梱。
+
+【テンプレート引数】
+WaveletMatrix<T,MAXLOG>: Tは整数、1<=MAXLOG<=Tの値ビット数。
+値は [0,2^MAXLOG)。負数は使用しない。
+CompressedWaveletMatrix<T,MAXLOG=20>: 値を座圧する。Tは大小・等値比較可能。
+相異なる値数 D に対し D<=2^MAXLOG が必要。負数・巨大値も可。
+RangeDistinctQuery<T>: mapで使える順序付きキー型。内部MAXLOGは20固定。
+
+【公開API】
+WM/CWM は vector<T> から構築。access(i)->T。
+rank(l,r,x)->int: [l,r)中のxの個数。
+kth_smallest(l,r,k),kth_largest(l,r,k)->T: 0-indexed順位。
+rank_less_than(l,r,upper)->int / range_freq(l,r,lower,upper)->int。
+prev_value(l,r,upper)->T: upper未満の最大値、next_value(l,r,lower)->T: lower以上の最小値。
+前後値がなければT(-1)。
+RangeDistinctQuery(vector<T>,use_ignore=false,ignore_val=T())。
+query(l,r)->int: 種類数。get_prev(i)->int: 同じ値の直前位置、初出・無視値は-1。
+BitVector(int n): set(i),build(),rank1(i),rank0(i)。rankは[0,i)の個数。
+
+【計算量】
+B=MAXLOG。WM構築 O(NB)、各クエリ O(B)、空間 O(B(N/64+1)+N)。
+CWM構築 O(Nlog N+NB)、値を二分探索するクエリは O(log D+B)。
+RDQ構築 O(Nlog N)、query O(log N+20)、get_prev O(1)。
+BitVector構築/build O(N/64+1)、set/rank O(1)。
+
+【注意点】
+静的配列で更新不可。0<=l<=r<=N、k<r-l。既定構築しただけではクエリ不可。
+CWMで実値-1があると「未発見」と区別できない。
+RDQは内部で最大 N+1 種類程度を20bitに載せるので制約を確認（例:N<=10^6）。
+入力値のMAXLOG超過はコンストラクタで検査されない。
+
+【内部実装用】
+WM.bv/mid、CWM.wm/vals、RDQ.wm/prev_idxは構築状態。BitVectorは単独利用も可能。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/WaveletMatrix.hpp"
+void solve(){
+    vl a = {-5,3,3,10};
+    CompressedWaveletMatrix<ll> wm(a);
+    RangeDistinctQuery<ll> rdq(a);
+    assert(wm.kth_smallest(0,4,1) == 3);
+    assert(wm.range_freq(0,4,0,10) == 2);
+    assert(rdq.query(0,4) == 3);
+    cout << wm.prev_value(0,4,10) << '\n'; // 3
+}
+--- C++20 ここまで ---

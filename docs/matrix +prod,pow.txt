@@ -1,0 +1,52 @@
+Matrix: 半環上の行列積・累乗
+対象: matrix +prod,pow.hpp / C++20
+
+【概要】
+通常の積和だけでなく min-plus など、利用者の半環演算で行列を計算する。
+
+【テンプレート引数】
+Matrix<S>。S は次を持つ型（値自体ではなく演算の定義を渡す）。
+using T: 成分型。
+static T add(T,T), mul(T,T), zero(), one()。
+add/mul は半環の性質を満たすよう設計。zero は加法単位元、one は乗法単位元。
+旧版の Semiring ひな形は削除済み。
+
+【公開API】
+Matrix(int h,int w): zero で初期化。公開 h,w,val[i][j]。
+static Matrix eye(int n): 単位行列。
+operator*(const Matrix& B): 行列積。左の幅==右の高さ。
+operator*(const vector<T>& v)->vector<T>: 列ベクトルへの作用。
+pow(ll k)->Matrix: 正方行列の k 乗。
+
+【計算量】
+構築 O(hw)、A(h×w)*B(w×z) O(hwz)、ベクトル積 O(hw)。
+n×n行列のpow(k) は O(n^3 log(k+1))、空間 O(n^2)。成分演算はO(1)を仮定。
+
+【注意点】
+k>=0。負のkでも単位行列を返してしまうので逆行列機能として使わない。
+val の範囲検査なし。演算のオーバーフローは利用者が管理。
+
+【内部実装用】
+内部専用関数なし。三重ループで積を計算する。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/matrix +prod,pow.hpp"
+struct Semiring {
+    using T = mint;
+    static T add(T a,T b){ return a+b; }
+    static T mul(T a,T b){ return a*b; }
+    static T zero(){ return 0; }
+    static T one(){ return 1; }
+};
+void solve(){
+    Matrix<Semiring> a(2,2);
+    a.val = {{1,1},{1,0}};
+    auto b = a.pow(5);
+    assert(b.val[0][1] == 5);
+    cout << b.val[0][1].val() << '\n';
+}
+--- C++20 ここまで ---

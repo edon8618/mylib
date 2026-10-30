@@ -1,0 +1,59 @@
+DynamicConnectivity: オンライン動的連結性・成分集約
+対象: dynamic_connectivity_monoid.hpp / C++20
+
+【概要】
+単純無向グラフの辺追加削除と成分の頂点値集約を逐次処理する。
+HDT型レベル構造とEuler Tour Treapを使用。
+
+【テンプレート引数】
+DynamicConnectivityHDT<S,op,identity>、別名 DynamicConnectivity<S,op,e>。
+S はコピー・既定構築可能。S op(S,S) は可換・結合的、S identity() は単位元。
+
+【公開API】
+DynamicConnectivity(int n,uint64_t seed=entropy()): 孤立頂点、値はidentity()。
+add(u,v)->bool / erase(u,v)->bool: 辺を追加／削除できたか。
+same(u,v)->bool、size(v)->int: 成分の頂点数。
+find(v)->uintptr_t: 成分の不透明な識別トークン。
+set(v,S x): 頂点値を代入。get(v)->S: 頂点値。
+apply(v,S x): 頂点値をop(現在値,x)に変更。
+prod(v)->S: vの成分の全頂点集約。
+
+【計算量】
+Treapの高さが期待 O(log N) なら same/size/find/prod/set/apply は
+期待 O(log N)、get O(1)。初期化 O(N)（プールのブロック単位確保を含む）。
+add/erase のこの最適化版について、厳密な最悪／償却時間は不明。
+標準HDTの計算量を無条件には転用しない。
+空間は作成済みレベル・プールの最大使用量・これまでの追加回数に依存し、
+現在の辺数だけでは評価できない。削除済み辺の管理情報も保持する。
+
+【注意点】
+0<=v<n。自己ループ、重複add、存在しないeraseはfalse。多重辺は扱わない。
+findの値は頂点番号ではなく、永続的な成分IDでもない。
+set/applyは頂点更新で、成分全体への一括更新ではない。
+明示seedは再現テスト用。opの順序は安定しないので非可換演算は不可。
+DC_SCAN_BUDGET既定32。DC_SKIP_POOL_FREE=1は破棄時にプールを解放しない設定。
+この資料では既定設定を用いる。
+
+【内部実装用】
+Node/Pool/Forest/Edge/EdgeMap/EdgePool とその他の補助関数・フィールドは
+内部実装用。structのpublicであっても列挙したAPI以外は通常呼ばない。
+
+【依存関係】
+標準ライブラリのみ（ヘッダーがbits/stdc++.hを読み込む）。例はtmp.cppのll/rep。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/dynamic_connectivity_monoid.hpp"
+ll op(ll a,ll b){ return a+b; }
+ll e(){ return 0; }
+void solve(){
+    DynamicConnectivity<ll,op,e> dc(3);
+    rep(i,3) dc.set(i,i+1);
+    dc.add(0,1); dc.add(1,2); dc.add(0,2);
+    assert(dc.prod(0) == 6);
+    dc.erase(0,1); assert(dc.same(0,1));
+    dc.erase(0,2);
+    assert(!dc.same(0,1) && dc.prod(1) == 5);
+    cout << dc.size(1) << '\n'; // 2
+}
+--- C++20 ここまで ---

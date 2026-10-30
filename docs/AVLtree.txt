@@ -1,0 +1,48 @@
+AVLtree: 順序統計付き多重集合
+対象: AVLtree.hpp / C++20
+
+【概要】
+平衡二分探索木で重複要素を管理。k番目取得と挿入位置の検索ができる。
+
+【テンプレート引数】
+AVLtree<T, Comp=less<T>>。T はコピー・代入可能なキー。Comp は狭義弱順序の比較器。
+「未満」「k番目」は Comp の順序。greater<T> なら降順。
+
+【公開API】
+AVLtree() / size() / empty() / clear()
+insert(key)->int: 追加し、追加前の rank(key) を返す（重複の先頭順位）。
+erase(key)->int: 1個削除して削除位置を返す。なければ -1。
+erase_all(key)->int: 全削除した個数。contains(key)->bool / count(key)->int。
+at(k)->optional<T>: 0-indexed の要素。範囲外は nullopt。
+rank(key)->int: key より前の要素数。
+lower_bound(key), upper_bound(key)->Iterator: key 以上／超の先頭位置。
+Iterator: index(), valid(), *it, ++/--, +=/-=, +/-整数。
+to_vector()->vector<T>: 順序通りに列挙。コピー不可、move 可。
+
+【計算量】
+size/empty/Iteratorの位置移動 O(1)。検索・1個更新・Iteratorの参照 O(log N)。
+erase_all は削除数 k に対し O((k+1)log(N+1))。clear/to_vector O(N)。空間 O(N)。
+
+【注意点】
+Iterator はノードでなく順位を保持。更新後に同じ要素を指す保証はない。
+end相当を参照しない。一般のSTLイテレータ同等の演算一式はない。
+
+【内部実装用】
+Node/root/comp、height/sz/update/bf、rotate_*、rebalance、insert_node、
+erase_kth、find_min/max、inorder、private destroy。直接操作しない。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/AVLtree.hpp"
+void solve(){
+    AVLtree<ll> st;
+    st.insert(5); st.insert(2); st.insert(5);
+    assert(st.rank(5) == 1 && st.count(5) == 2);
+    assert(st.at(1).value() == 5);
+    st.erase(5);
+    cout << st.size() << '\n'; // 2
+}
+--- C++20 ここまで ---

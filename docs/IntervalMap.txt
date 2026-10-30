@@ -1,0 +1,43 @@
+IntervalMap: 値付き区間の上書き
+対象: IntervalMap.hpp / C++20
+
+【概要】
+区間を値で塗り直し、上書きで消えた旧区間と値を回収する。
+
+【テンプレート引数】
+IntervalMap<T,V>。T は座標、V は値。Vは既定構築・コピー可能であること。
+
+【公開API】
+IntervalMap(T min_val,T max_val,V default_val): 全域を1区間で初期化。
+split(T x)->set<Node>::iterator: xで区間を分割し右側を返す。
+assign(T l,T r,V val)->vector<Node>: [l,r)を上書き。
+返却Nodeは上書き範囲で切り取られた旧区間 {l,r,val}。
+公開 st: 現在の区間集合。dump(): デバッグ表示。
+
+【計算量】
+区間数K。split O(log K)、assignは触れる区間tに対し O(log K+t)
+（set範囲削除を含む）。dump O(K)。空間 O(K)、返却 O(t)。
+
+【注意点】
+min_val<=l<r<=max_val。空区間assignはしない。splitは範囲内端点で使う。
+隣り合う同じ値の区間を自動結合しない。単なる区間上書き以外の
+ODT拡張に対する高速性は保証しない。
+
+【内部実装用】
+Nodeの比較は左端だけ。splitは利用可能な低水準API、stの直接変更は不変条件を保つ必要あり。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/IntervalMap.hpp"
+void solve(){
+    IntervalMap<ll,ll> im(0,10,0);
+    auto old = im.assign(2,5,7);
+    assert(old.size() == 1 && old[0].l == 2 && old[0].r == 5);
+    ll sum = 0;
+    for(auto node : im.st) sum += (node.r-node.l)*node.val;
+    cout << sum << '\n'; // 21
+}
+--- C++20 ここまで ---

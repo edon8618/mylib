@@ -1,0 +1,64 @@
+geo_real: 浮動小数点幾何・円
+対象: geometoric/geo_real.hpp / C++20
+
+【概要】
+直線・距離・凸多角形・円・接線をlong doubleで扱う。
+
+【テンプレート引数】
+なし。geo_real::P の座標、半径、角度、距離はlong double。角度はラジアン。
+
+【公開API】
+全て geo_real 名前空間。EPS=1e-12L、PI。sgn(x),eq(a,b)。
+P{x,y}: +,-,単項-,実数倍,除算、==,<、入出力。
+dot/cross(2点または3点)/norm2/len/dist/orient/samePoint/rotate90/rotate。
+Line{a,b}: 直線。Segment{a,b}: 閉線分。Circle{c,r}: 中心・非負半径。
+projection(Line,P),reflection(Line,P)->P。
+lineIntersection(Line,Line)->optional<P>: 一意交点、平行・一致はnullopt。
+onSegment(a,b,p),segmentsIntersect(Segment,Segment)->bool。
+distance(Line,P),distance(Segment,P),distance(Segment,Segment)->実数。
+Poly=vector<P>。convexHull(Poly)->Poly: 冗長な一直線頂点なしのCCW凸包。
+signedArea(poly),area(poly)、pointInPolygon(poly,p)、pointInConvex(poly,p)。
+  包含は外0・境界1・内2。signedAreaはCCWが正。
+convexCut(poly,Line)->Poly: 有向直線の左側（境界込み）で切る。
+convexIntersection(Poly a,const Poly& b)->Poly: CCW凸多角形の共通部分。
+circle2(a,b),circle3(a,b,c)->Circle: 2点径の円／3点外接円。
+  3点一直線なら最遠2点の直径円。contains(Circle,P)->bool。
+minimumEnclosingCircle(vector<P>)->Circle: 最小包含円、空は半径0の原点円。
+circleLineIntersection(Circle,Line),circleCircleIntersection(Circle,Circle)->vector<P>。
+tangentPoints(Circle,P)->vector<P>: 接点0/1/2個。
+commonTangents(Circle,Circle)->vector<Line>: 共通接線。
+circlePolygonIntersectionArea(poly,Circle)->実数: 単純多角形と円の共通面積。
+
+【計算量】
+基本演算・交点・接線は O(1)。凸包 O(Nlog N)。面積・一般包含・convexCut・
+円多角形面積 O(N)、凸包含 O(log N)。convexIntersectionは逐次切断で
+O(M(N+M)) を安全な上界とする（中間頂点数も増え得る）。
+最小包含円は乱数順なら期待 O(N)、最悪 O(N^3)。
+ただしこの実装は固定seedなので入力に対する乱択期待保証とは区別する。空間 O(N+M)。
+
+【注意点】
+tmp.cppのll/ldマクロ定義前にinclude。Pの==と<は誤差なし比較、
+近似一致はsamePoint/eq。EPSのスケールが入力に合うか確認する。
+Lineは異なる2点が必須。半径非負。凸演算はCCWを渡し、
+convexIntersectionは両方3頂点以上の非退化凸多角形。
+一致円の無限個交点・接線は空配列。commonTangentsのLine.bは通常接点だが
+接する円の場合は接線方向用の点であり、常に第2円の接点とは限らない。
+
+【内部実装用】
+公開APIは上記。各関数内の走査・乱択・切断・補助変数は内部用。
+
+【依存関係】
+単独ヘッダー。tmp.cppでは ll/ld マクロの定義前にincludeする。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/geometoric/geo_real.hpp"
+void solve(){
+    using geo_real::P;
+    auto h = geo_real::convexHull(vector<P>{{0,0},{2,0},{2,2},{0,2}});
+    assert(geo_real::eq(geo_real::area(h),4));
+    auto p = geo_real::lineIntersection({{0,0},{2,2}},{{0,2},{2,0}});
+    assert(p && geo_real::samePoint(*p,{1,1}));
+    cout << fixed << setprecision(10) << geo_real::area(h) << '\n';
+}
+--- C++20 ここまで ---

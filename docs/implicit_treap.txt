@@ -1,0 +1,60 @@
+implicit_treap: 挿入・削除・反転・遅延更新付き列
+対象: implicit_treap.hpp / C++20
+
+【概要】
+位置をキーとする乱択二分木。区間 [l,r) の集約・更新・反転を行う。
+
+【テンプレート引数】
+implicit_treap<S,F,op,e,mapping,composition,id,rev_op>（S,Fが最初に並ぶ）。
+S op(S,S), S e(): 順序付きモノイド。
+S mapping(F,S), F composition(F f,F g), F id(): gの後にfを適用。
+S rev_op(S): 逆順の表現。rev_op(op(a,b))=op(rev_op(b),rev_op(a))、
+二度反転すると元に戻り、更新と反転が整合するよう定義。
+単一要素 val にも rev_op/mapping が適用される。
+
+【公開API】
+implicit_treap() / size()->int。コピー不可、move可。
+build(const vector<S>&): 全要素を置換。
+get(int i)->S: i番目、範囲外ならe()。
+insert(int pos,const S&): posの直前に追加（末尾pos=sizeも可）。
+erase(int pos): 1要素削除。
+apply(l,r,const F&) / range_reverse(l,r) / prod(l,r)->S。
+to_vector()->vector<S>: 順序通りに列挙。
+
+【計算量】
+乱択の期待: 1個更新・取得・区間操作 O(log N)、1回の最悪 O(N)。
+buildは逐次mergeなので期待 O(N log N) を上界として使える。to_vector O(N)。
+空間 O(N)、再帰深さは期待 O(log N)、最悪 O(N)。
+
+【注意点】
+区間は0-indexed半開。erase は実装上pos==sizeも通り無操作だが、通常はpos<size。
+getは負数もe()になる。反転時に単一要素の内部表現を変える場合はrev_opを適切に設計。
+巨大S/Fの演算・コピー費用は別。
+
+【内部実装用】
+Node/root/rng、destroy/make_node/split/merge/build_from_vector、
+to_vector(Node*,vector&) は内部用（言語上public）。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/implicit_treap.hpp"
+struct S { ll sum,len; };
+using F = ll;
+S op(S a,S b){ return {a.sum+b.sum,a.len+b.len}; }
+S e(){ return {0,0}; }
+S mapping(F f,S x){ return {x.sum+f*x.len,x.len}; }
+F composition(F f,F g){ return f+g; }
+F id(){ return 0; }
+S rev_op(S x){ return x; }
+void solve(){
+    implicit_treap<S,F,op,e,mapping,composition,id,rev_op> seq;
+    seq.build(vector<S>{{1,1},{2,1},{3,1}});
+    seq.range_reverse(0,3); seq.apply(0,2,10);
+    seq.insert(1,{5,1}); seq.erase(3);
+    assert(seq.get(0).sum == 13 && seq.prod(0,3).sum == 30);
+    cout << seq.prod(0,3).sum << '\n';
+}
+--- C++20 ここまで ---

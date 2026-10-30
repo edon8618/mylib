@@ -1,0 +1,38 @@
+CRT: 2本の合同式の合成
+対象: CRT.hpp / C++20
+
+【概要】
+x≡r1 (mod m1), x≡r2 (mod m2) を合成する。互いに素でなくてもよい。
+
+【テンプレート引数】
+CRT<T>, safe_mod<T>。T は符号付き整数型、__int128、または cpp_int。
+全引数を同じ型にする。cpp_int 使用時はBoostヘッダーを別途読み込む。
+
+【公開API】
+safe_mod(T a,T m)->T: [0,m) に正規化。
+CRT(T r1,T m1,T r2,T m2)->pair<T,T>: {最小非負解,lcm(m1,m2)}。
+解なしは {0,0}。m1,m2 は正。
+
+【計算量】
+固定幅演算を定数時間とすれば O(log(min(m1,m2)+1)) 回の互除法。
+再帰領域も同程度。cpp_int のビット演算費用は別。
+
+【注意点】
+非正のmodは invalid_argument。有界型の中間値が溢れると overflow_error。
+最終結果が収まっても中間積で例外になり得るので必要なら型を広げる。
+
+【内部実装用】
+namespace crt_detail の add/sub/mul/mod/egcd は内部用。extend_gcd.hpp は不要。
+
+【依存関係】
+tmp.cpp の標準ヘッダー。GCC/Clang の overflow builtin と __int128 を使用。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/CRT.hpp"
+void solve(){
+    auto [r,m] = CRT(2LL,3LL,3LL,5LL);
+    assert(r == 8 && m == 15);
+    cout << r << ' ' << m << '\n';
+}
+--- C++20 ここまで ---

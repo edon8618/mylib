@@ -1,0 +1,38 @@
+Compress: 座標圧縮
+対象: compress.hpp / C++20
+
+【概要】
+値を登録してソート・重複除去し、値と0-indexed順位を相互変換する。
+
+【テンプレート引数】
+Compress<T>。T は < と == で比較できるコピー可能型。
+
+【公開API】
+add(T x): 値を登録。build(): 登録値をソート・重複除去。
+to_idx(T x)->int: lower_bound の位置（未登録値でも挿入位置を返す）。
+to_val(int k)->T: k番目の登録値。size()->int: 現在の xs.size()。
+
+【計算量】
+add 償却 O(1)、build O(N log N)、to_idx O(log N)、to_val/size O(1)。空間 O(N)。
+
+【注意点】
+add完了後にbuild。build後にaddしたら再buildが必要。to_val は 0<=k<size()。
+
+【内部実装用】
+xs は圧縮・復元用配列。build後は読み取り用に扱う。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/compress.hpp"
+void solve(){
+    Compress<ll> cp;
+    vl a = {100, -5, 100};
+    for(ll x : a) cp.add(x);
+    cp.build();
+    assert(cp.to_idx(100) == 1 && cp.to_val(0) == -5);
+    cout << cp.size() << '\n'; // 2
+}
+--- C++20 ここまで ---

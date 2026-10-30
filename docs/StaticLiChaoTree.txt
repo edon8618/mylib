@@ -1,0 +1,40 @@
+StaticLiChaoTree: 座標登録型の直線最大値
+対象: StaticLiChaoTree.hpp / C++20
+
+【概要】
+事前登録したx座標で、直線・線分の最大値を求める。
+
+【テンプレート引数】
+StaticLiChaoTree<T>。座標・傾き・切片・返り値が全てT。llやdoubleを使用。
+
+【公開API】
+StaticLiChaoTree(vector<T> xs,T inf_val): inf_val は未登録時の負の単位値。
+add_line(T m,T c): y=mx+c を全座標に登録。
+add_segment(T m,T c,T l,T r): [l,r)にだけ登録。query(T x)->T: 最大値。
+
+【計算量】
+座標数N。構築 O(Nlog N)、空間 O(N)。add_line/query O(log N)、
+add_segment O(log^2 N)。
+
+【注意点】
+未登録座標のqueryはinf_valを返す。全ての線の評価値をTに収める。
+inf_valは有効な値以下にする。最小値が欲しければ傾き・切片・結果を反転。
+浮動小数点版はEPS=1e-9で座標をまとめ、線分境界にもEPSを用いる。
+空座標列は内部で{0}に置き換える。
+
+【内部実装用】
+private _add_segment/_add_line/_query。Line/tree/xsは格納状態。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/StaticLiChaoTree.hpp"
+void solve(){
+    StaticLiChaoTree<ll> seg(vl{0,1,2,3},-inf);
+    seg.add_line(2,1); seg.add_segment(-1,10,1,3);
+    assert(seg.query(2) == 8 && seg.query(3) == 7);
+    cout << seg.query(2) << '\n';
+}
+--- C++20 ここまで ---

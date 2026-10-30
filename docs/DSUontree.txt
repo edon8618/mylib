@@ -1,0 +1,45 @@
+DSUonTree: 部分木の状態を使い回すオフライン処理
+対象: DSUontree.hpp / C++20
+
+【概要】
+add/del/query を指定し、各部分木について1つの状態を作って答えを記録する。
+
+【テンプレート引数】
+DSUonTree<Add,Del,Query>。引数に int v を取る関数・ラムダの型。
+コンストラクタから型推論できる。戻り値は使用されない。
+
+【公開API】
+DSUonTree(int n,Add add,Del del,Query query)。add_edge(u,v): 無向辺。
+build(root=0): 分解と全頂点へのquery実行。query(v)時点ではvの部分木だけが
+状態に入っている。処理後は根の部分木全体の状態を保持する。
+
+【計算量】
+O(N log N) 回の add/del と N 回の query。コールバックO(1)なら O(N log N)。
+構造の空間 O(N)、再帰深さ最悪 O(N)。
+
+【注意点】
+add と del は逆操作にする。状態は実行前に空にしておく。build は1回だけ。
+コメントに再帰排除とあるが dfs_sz/dfs_hld/dfs_dsu は再帰。
+N>=1、連結な木、0-indexed。to/nxt は2N枠なので無制限に辺追加しない。
+
+【内部実装用】
+private dfs_sz/dfs_hld/dfs_dsu。head/to/nxt/sz/heavy_child/in/out/rev/timer は作業状態。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/DSUontree.hpp"
+void solve(){
+    vl value = {1,2,3}, ans(3);
+    ll sum = 0;
+    auto add = [&](int v){ sum += value[v]; };
+    auto del = [&](int v){ sum -= value[v]; };
+    auto query = [&](int v){ ans[v] = sum; };
+    DSUonTree dsu(3,add,del,query);
+    dsu.add_edge(0,1); dsu.add_edge(0,2); dsu.build();
+    assert((ans == vl{6,2,3}));
+    cout << ans[0] << '\n';
+}
+--- C++20 ここまで ---

@@ -1,0 +1,41 @@
+RollingHash: 文字列の区間ハッシュ
+対象: RollingHash.hpp / C++20
+
+【概要】
+法 2^61-1 の多項式ハッシュ。実行ごとに共通の基数を乱数初期化する。
+
+【テンプレート引数】
+なし。対象は string、ハッシュ型は uint64_t。
+
+【公開API】
+RollingHash(const string& s): ハッシュを構築。
+get(int l,int r)->uint64_t: [l,r) のハッシュ。
+static concat(h1,h2,int len2): 後ろの文字列長 len2 を使って連結。
+static init_base(): 初回構築時に自動呼び出し。base/power は全インスタンス共通。
+
+【計算量】
+構築 O(N) と必要な power の延長分。get/concat O(1)。
+インスタンス O(N)、共通 power は最大文字列長 O(Nmax)。
+
+【注意点】
+衝突の可能性がある。等しい長さも確認する。0<=l<=r<=N。
+concat 前に power[len2] が構築済みであること。base/power を途中で変更しない。
+文字は char の値を直接足すため、通常のASCII文字列を使用する。
+static変数の実体定義があるので複数翻訳単位のリンクはODR違反になり得る。
+
+【内部実装用】
+private Mul。hash/power/base は計算済み状態。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/RollingHash.hpp"
+void solve(){
+    RollingHash h("abcabc");
+    assert(h.get(0,3) == h.get(3,6));
+    assert(RollingHash::concat(h.get(0,3),h.get(3,6),3) == h.get(0,6));
+    cout << (h.get(0,3) == h.get(3,6)) << '\n'; // 1
+}
+--- C++20 ここまで ---

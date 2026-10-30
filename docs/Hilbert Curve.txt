@@ -1,0 +1,37 @@
+hilbert_order: 2次元のHilbert順キー
+対象: Hilbert Curve.hpp / C++20
+
+【概要】
+Moなどで点 (x,y) を並べ替えるキーを計算する。
+
+【テンプレート引数】
+なし。x,y,pow,rotate は int、返り値は int64_t。
+
+【公開API】
+hilbert_order(int x,int y,int pow,int rotate)->int64_t。
+通常 rotate=0、0<=x,y<2^pow。
+
+【計算量】
+時間・再帰領域 O(pow)。キーで N 点をソートするなら前計算 O(N pow)、ソート O(N log N)。
+
+【注意点】
+0<=pow<=31 を使用。キーを符号付き64bitに収めるため上限31。
+rotate は 0..3。pow=0 では0。座標の範囲検査はない。
+
+【内部実装用】
+再帰呼び出しと回転テーブルは内部用。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Hilbert Curve.hpp"
+void solve(){
+    vector<pair<ll, pair<ll,ll>>> v;
+    rep(x, 2) rep(y, 2) v.push_back({hilbert_order(x,y,1,0), {x,y}});
+    sort(all(v));
+    assert(v.front().first == 0 && v.back().first == 3);
+    cout << v.size() << '\n'; // 4
+}
+--- C++20 ここまで ---

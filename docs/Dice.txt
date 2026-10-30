@@ -1,0 +1,38 @@
+Dice: サイコロの回転
+対象: Dice.hpp / C++20
+
+【概要】
+6面の値と向きを管理。24方向の回転を列挙する。
+
+【テンプレート引数】
+Dice<T=int>。面に入れるコピー可能型。既定構築は全て0で初期化。
+
+【公開API】
+Dice() / Dice(const array<T,6>&)。val の順序は
+0:上、1:前、2:右、3:左、4:後、5:下。top(),bottom()->T。
+roll_N/S/E/W(): 各方向へ転がす。roll_R/L(): 上下を固定して回す。
+get_all_rotations()->vector<Dice>: 24状態を返す。==,!=,< は val の比較。
+
+【計算量】
+全操作 O(1)（24も定数）。T の操作費用は別。
+
+【注意点】
+面の値が重複していれば列挙結果も重複する。== は現在の向き込み。
+roll_N 後の上面は元の前面、roll_E 後の上面は元の左面。
+
+【内部実装用】
+private roll(a,b,c,d): 4面の値の巡回。
+
+【依存関係】
+ヘッダーは vector/array/algorithm を読み込む。例は tmp.cpp の ll/cout を使用。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Dice.hpp"
+void solve(){
+    Dice<ll> d(array<ll,6>{1,2,3,4,5,6});
+    d.roll_N();
+    assert(d.top() == 2 && d.get_all_rotations().size() == 24);
+    cout << d.bottom() << '\n'; // 5
+}
+--- C++20 ここまで ---

@@ -1,0 +1,39 @@
+LCA: ダブリング
+対象: LCA ダブリング.hpp / C++20
+
+【概要】
+根付きの静的な無向木で最小共通祖先・辺数距離・祖先を取得する。
+
+【テンプレート引数】
+なし。隣接リスト型は vector<vector<ll>>。
+
+【公開API】
+LCA(const vector<vector<ll>>& g,root=0): 構築。
+query(u,v): LCAの頂点番号。dist(u,v): パスの辺数（重み付き距離ではない）。
+kth_ancestor(v,k): k個上の祖先、k=0ならv、k<0または深さ超過は-1。
+is_ancestor(p,s): pがsの祖先か。p==sもtrue。
+
+【計算量】
+構築・空間 O(N log N)。各クエリ O(log N)。
+
+【注意点】
+N>=1、連結で閉路のない木を渡す。両LCAヘッダーは同じグローバル型名なので同時include不可。
+DFS は再帰。深い木ではスタック枯渇に注意。頂点は0-indexed。
+
+【内部実装用】
+dfs は内部構築用（言語上public）。parent/depth/G は計算済み状態。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/LCA ダブリング.hpp"
+void solve(){
+    vector<vl> g = {{1},{0,2},{1}};
+    LCA lca(g);
+    assert(lca.query(1,2) == 1 && lca.dist(0,2) == 2);
+    assert(lca.kth_ancestor(2,2) == 0);
+    cout << lca.dist(0,2) << '\n';
+}
+--- C++20 ここまで ---

@@ -1,0 +1,195 @@
+HLD_Lazy ― 木のパス・部分木への遅延更新／集約
+対象: HLD_lazy.hpp / C++20 / 同梱 tmp.cpp 用
+
+【概要・最短手順】
+静的な無向木を重軽分解し、ACL lazy_segtree で更新・集約する。
+頂点値／辺値に対応。prod_path(u,v) は u→v の順序で集約する。
+1. S・F と演算関数を定義 → HLD_Lazy<...> tree(N)
+2. add_edge(u,v) を N-1 回呼ぶ（頂点番号は 0-indexed）
+3. build_vertex(root,初期値) または build_edge(root,初期値)
+4. 各クエリを呼ぶ。構築後の辺追加・削除には対応しない。
+
+【テンプレート引数】
+HLD_Lazy<S, op, e, F, mapping, composition, id, rev_op>
+引数はこの順番。関数ポインタの型は次のとおり。
+
+  S                  区間の集約値の型。
+  S op(S a, S b)     左区間 a、右区間 b の順に結合する。結合則が必要。
+  S e()             op の左右の単位元。空区間の結果にもなる。
+  F                  遅延更新の型。
+  S mapping(F f,S x) 集約値 x に更新 f を適用した結果。
+  F composition(F f,F g)
+                     g を適用した後に f を適用する更新を返す。
+  F id()            何もしない更新。
+  S rev_op(S x)     区間を逆順にした集約値を返す。型は S→S。
+
+必要な整合性（利用者が満たす条件）:
+・mapping(id(),x) = x
+・mapping(composition(f,g),x) = mapping(f,mapping(g,x))
+・mapping(f,op(a,b)) = op(mapping(f,a),mapping(f,b))
+・rev_op(e()) = e()、rev_op(rev_op(x)) = x
+・rev_op(op(a,b)) = op(rev_op(b),rev_op(a))
+・同じ要素更新を逆向きでも使うので、rev_op(mapping(f,x)) と
+  mapping(f,rev_op(x)) が一致するよう設計する。
+
+例: 区間加算・区間和なら S={sum,len}、F=加算量。
+mapping(f,x)={x.sum+f*x.len,x.len}。総和だけを持つと長さが分からない。
+op が可換なら rev_op(x)=x でよい。
+非可換なら S に順方向・逆方向の集約値を持たせ、rev_op で交換する方法がある。
+例: op(a,b)={a.forward*b.forward,b.backward*a.backward}。
+rev_op は演算の逆元を求める関数ではない。
+
+【公開API: 通常呼ぶ関数】
+HLD_Lazy(int n)
+  n 頂点の領域を確保する。利用時は n>=1。まだクエリは呼べない。
+void add_edge(int u,int v)
+  無向辺を追加。辺番号は呼び出し順に 0,1,...。
+void build_vertex(int root,const vector<S>& init)
+  根を root に固定し構築。init.size()==n、init[v] は頂点 v の値。
+void build_edge(int root,const vector<S>& init)
+  init.size()==n-1、init[i] は i 番目に追加した辺の値。
+  内部では辺値を深い側の頂点に対応させる。根の位置には e() を置く。
+  どちらの build も、渡した初期値から seg を作り直す。
+
+S prod_path(int u,int v)
+void apply_path(int u,int v,const F& f)
+  頂点モード: 両端を含むパス。辺モード: パス上の辺のみ。
+  prod は u→v の順。u==v なら頂点モードはその1頂点、辺モードは e()。
+S prod_subtree(int u)
+void apply_subtree(int u,const F& f)
+  固定した根から見た u の部分木。
+  頂点モードは u を含む。辺モードは部分木の内部辺だけを含み、
+  親―u の辺を含めない。葉の辺モードは空。
+S prod_outside(int u)
+void apply_outside(int u,const F& f)
+  上記 subtree の対象範囲の補集合。
+  辺モードでは親―u の辺を含み、根のダミー位置も対象になり得る。
+int lca(int u,int v)
+  構築時の根に関する最小共通祖先。頂点番号を返す。
+
+部分木系 prod の結合順は HLD の in 順。頂点番号順ではない。
+outside は in 順の左側区間、右側区間の順に結合する。
+
+【内部実装用: 通常は触らない】
+private: build_dfs(int root)
+  サイズ計算と重軽分解。再帰を使わず明示的なスタックで処理する。
+  g 内の隣接頂点の順番を入れ替える。
+
+次のメンバも struct のため言語上は public だが、内部状態として扱う。
+n, g, edges, sz, in, out, head, rev, parent, depth, timer, is_vertex, seg
+  in[v]: HLD の位置、out[v]: 部分木の終端（半開区間）。
+  rev[i]: 位置 i の頂点、head[v]: 重いパスの先頭、sz[v]: 部分木サイズ。
+  parent[root] は -1。seg は in 順に格納された ACL のセグ木。
+直接書き換えると各操作の前提が崩れる。
+
+【計算量】
+以下は S・F のコピーと op/e/mapping/composition/id/rev_op が O(1) の場合。
+・コンストラクタ: 時間 O(N)、空間 O(N)。
+・add_edge: 1 回あたり償却 O(1)。
+・build_vertex / build_edge: 時間 O(N)、追加作業領域 O(N)。
+・prod_path / apply_path: O(log^2 N)。
+・prod_subtree / apply_subtree / prod_outside / apply_outside: O(log N)。
+・lca: O(log N)。
+・全体の保持領域: O(N)。
+文字列など、演算・コピー自体が非定数時間ならその費用が加わる。
+具体的な費用は利用者の S・F・関数に依存するため、一律には定まらない。
+
+【使用例: 頂点への区間加算・区間和】
+入力:
+  N Q
+  a[0] ... a[N-1]
+  続く N-1 行: u v（0-indexed）
+  続く Q 行:
+    0 u v x : u-v パス上の頂点に x 加算
+    1 u v   : u-v パス上の頂点の和を出力
+    2 u x   : u の部分木の頂点に x 加算
+    3 u     : u の部分木の頂点の和を出力
+根は 0。long long に計算結果が収まる入力を仮定。
+
+
+--- C++20 ここから ---
+#include "mylib/HLD_lazy.hpp"
+
+struct S { ll sum, len; };
+using F = ll;
+S op(S a, S b) { return {a.sum + b.sum, a.len + b.len}; }
+S e() { return {0, 0}; }
+S mapping(F f, S x) { return {x.sum + f * x.len, x.len}; }
+F composition(F f, F g) { return f + g; }
+F id() { return 0; }
+S rev_op(S x) { return x; }
+using Tree = HLD_Lazy<S, op, e, F, mapping, composition, id, rev_op>;
+
+void solve(){
+    ll n, q;
+    cin >> n >> q;
+    vector<S> a(n);
+    rep(i, n){
+        cin >> a[i].sum;
+        a[i].len = 1;
+    }
+    Tree tree(n);
+    rep(i, n - 1){
+        ll u, v;
+        cin >> u >> v;
+        tree.add_edge(u, v);
+    }
+    tree.build_vertex(0, a);
+    rep(i, q){
+        ll t, u;
+        cin >> t >> u;
+        if(t == 0){
+            ll v, x;
+            cin >> v >> x;
+            tree.apply_path(u, v, x);
+        }else if(t == 1){
+            ll v;
+            cin >> v;
+            cout << tree.prod_path(u, v).sum << '\n';
+        }else if(t == 2){
+            ll x;
+            cin >> x;
+            tree.apply_subtree(u, x);
+        }else{
+            cout << tree.prod_subtree(u).sum << '\n';
+        }
+    }
+}
+--- C++20 ここまで ---
+
+辺モードへの切替:
+同じ S/F を使い、add_edge 順の vector<S> w(N-1) に
+各辺を {重み,1} として格納し、build_vertex の代わりに
+tree.build_edge(0,w) を呼ぶ。クエリの頂点番号の渡し方は同じ。
+
+【依存関係・ビルド】
+・GCC/libstdc++ の <bits/stdc++.h> と ACL の atcoder/lazysegtree。
+・このライブラリ自体は外部の ll / all / using namespace std を要求しない。
+・例は ~/lib/mylib/HLD_lazy.hpp、ACL は ~/lib/ac-library-master/atcoder/
+  に配置した想定。tmp.cpp に上の例を組み込んだものを a.cpp として実行する。
+
+g++ -std=c++20 -O2 -I "$HOME/lib" -I "$HOME/lib/ac-library-master" a.cpp -o a.out
+
+提出用に ACL ごと展開する場合:
+oj-bundle a.cpp -I "$HOME/lib" -I "$HOME/lib/ac-library-master" > a_submit.cpp
+g++ -std=c++20 -O2 a_submit.cpp -o a.out
+
+【注意点】
+・連結・閉路なしの木を渡すこと。辺数・根などの assert はあるが、
+  不正なグラフ全般を安全に検出する実装ではない。
+・クエリ前に build が必要。根の変更は再構築を要し、以前の更新は引き継がない。
+・辺モードの outside は根のダミー位置まで更新することがある。
+  mapping(f,e())=e() を満たし、ダミーが集約値に混ざらない設計にする。
+  例の {sum,len} は e()={0,0} なので加算しても変わらない。
+・非可換 op の場合、部分木の集約順は g の並びと HLD に依存する。
+・今回の版では末尾の S/F/op 等のひな形は削除されている。
+  使用例のようにグローバルで定義でき、衝突回避用の名前空間は不要。
+・tmp.cpp の ll は long long のマクロ。HLD の内部インデックスは int のため、
+  引数は int で表せる範囲に収める。
+
+【この説明の確認範囲】
+更新版 HLD_lazy.hpp を通読し、旧版との差分と tmp.cpp を確認して作成。
+使用例を実際の tmp.cpp に組み込み、C++20 で通常・oj-bundle 展開後の
+両方をコンパイルして実行確認。30 個のランダムな木・各 200 操作で
+パス／部分木の加算・総和を愚直計算と照合。
+ライブラリ全機能の正しさを保証する検証ではない。

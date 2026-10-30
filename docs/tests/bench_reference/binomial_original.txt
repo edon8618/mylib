@@ -1,0 +1,38 @@
+ArbitraryModBinomial: ベンチマーク用旧版
+対象: tests/bench_reference/binomial_original.hpp / C++20
+
+【概要】
+速度比較のため保存された参考実装。通常利用はルートのArbitraryModBinomial.hppを選ぶ。
+
+【テンプレート引数】
+なし。公開名は本体と同じ ArbitraryModBinomial、引数・返り値はll。
+
+【公開API】
+ArbitraryModBinomial(ll m,ll n_max)、nCr(ll n,ll r)->ll。
+C(n,r) mod m。n<0,r<0,r>nなら0。n>n_maxは例外（m=1は先に0）。
+
+【計算量】
+m=積q_i（素数冪）。構築 O(sqrt(m)+Σmin(n_max,q_i)+k log m)、
+空間 O(Σmin(n_max,q_i)+Σe_i)。クエリ O(Σ(log(n+1)/log p_i+log q_i))。
+
+【注意点】
+同名クラスを定義するため本体や他の比較版と同時include不可。
+#pragma onceもないので多重include不可。各min(n_max,q_i)<=20000000。
+旧Barrett乗算はmodの素数冪が32bit以内となる範囲で使う。
+modとn_maxの妥当性検査がなく、因数分解のi*iも極端な値で溢れ得る。
+
+【内部実装用】
+private modinv/Barrett/BinomialModPe/fact_no_p/CRT係数。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/tests/bench_reference/binomial_original.hpp"
+void solve(){
+    ArbitraryModBinomial comb(12,100);
+    assert(comb.nCr(6,3) == 8);
+    cout << comb.nCr(6,3) << '\n';
+}
+--- C++20 ここまで ---

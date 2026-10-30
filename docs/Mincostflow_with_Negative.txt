@@ -1,0 +1,49 @@
+MinCostFlowWithNegative: 負コスト辺付き最小費用流
+対象: Mincostflow_with_Negative.hpp / C++20
+
+【概要】
+SPFAでポテンシャルを作り、非負コストに変換してACL最小費用流を呼ぶ。
+
+【テンプレート引数】
+MinCostFlowWithNegative<Cap,Cost>。通常は両方llなどの整数型。
+Cost は符号付きで負コストとINF_COSTを表せること。
+
+【公開API】
+MinCostFlowWithNegative(int n)。add_edge(from,to,cap,cost): 有向辺。
+flow(s,t,flow_limit=max(Cap))->pair<Cap,Cost>: {流せた量,最小費用}。
+slope(s,t,flow_limit)->vector<pair<Cap,Cost>>: 費用関数の折れ点。
+get_cost(slope_data,f)->Cost: 折れ線を補間。f>最大流ならINF_COST。
+edges()->vector<Edge> / get_edge(int i)->Edge: {from,to,cap,flow,cost}。
+負閉路検出時は flow={0,-INF_COST}、slope={{0,-INF_COST}}。
+tに到達不可は{0,0}または{{0,0}}。
+
+【計算量】
+SPFAの通常の最悪評価 O(VE) と、ACLの増加路処理 O(F(V+E)log(V+1))
+を目安とする。Fは整数容量での流量上限。空間 O(V+E)。
+get_cost O(log B)、edges O(E)、get_edge O(1)。Bは折れ点数。
+このキュー回数による負閉路判定の厳密な挙動・実装固有の最悪時間は未検証。
+
+【注意点】
+s!=t、容量非負。容量0の辺は登録自体が省かれ、get_edgeの番号にも含まれない。
+負閉路のある問題は対象外。負閉路検出用の特殊結果は通常のslopeに渡さない。
+flow/slopeは呼ぶたび元容量から計算し直し、flow記録を上書きする。
+到達不可などの早期returnでは以前のflow記録が残り得る。
+費用・ポテンシャル差・流量との積をCostの範囲内に収める。
+
+【内部実装用】
+INF_COST=numeric_limits<Cost>::max()/2、_edges とローカルSPFA・mcf構築は内部用。
+
+【依存関係】
+tmp.cpp と ACL atcoder/mincostflow（tmp.cpp の atcoder/all に含まれる）。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Mincostflow_with_Negative.hpp"
+void solve(){
+    MinCostFlowWithNegative<ll,ll> g(3);
+    g.add_edge(0,1,2,-3); g.add_edge(1,2,2,5);
+    auto [f,cost] = g.flow(0,2,2);
+    assert(f == 2 && cost == 4 && g.get_edge(0).flow == 2);
+    cout << f << ' ' << cost << '\n';
+}
+--- C++20 ここまで ---

@@ -1,0 +1,85 @@
+mylib 使い方一覧
+
+対象: 更新版mylib + 追加されたTree.hpp。計49ヘッダー。
+各 .hpp に対応する同じ相対パスの .txt を docs/ に収録。
+例: geometoric/geo_int.hpp → docs/geometoric/geo_int.txt
+使用例は同梱されていた tmp.cpp の ll/rep/mint/using 等を使用するC++20コード。
+入力のある例は入出力仕様を本文に記載。その他は小さな固定データで動作を示す。
+
+通常のincludeパスの例:
+  ~/lib/mylib/AVLtree.hpp
+  ~/lib/ac-library-master/atcoder/all
+
+g++ -std=c++20 -O2 -I "$HOME/lib" -I "$HOME/lib/ac-library-master" a.cpp -o a.out
+oj-bundle a.cpp -I "$HOME/lib" -I "$HOME/lib/ac-library-master" > a_submit.cpp
+g++ -std=c++20 -O2 a_submit.cpp -o a.out
+
+幾何ヘッダー2本のみ、ヘッダー内の ll/ld の型別名とtmp.cppのマクロが
+衝突するため、#define ll / #define ld より前のinclude群で読み込む。
+他の例の演算関数はグローバル定義。同時利用で op/e/S/F 等が衝突する場合は
+関数名・型名を用途別に変える。
+
+計算量は原則として利用者の演算・比較・値コピーが O(1) の場合。
+未確認の厳密な償却・最悪計算量を推定して断定せず、不明と明記した。
+構造体が言語上 public にしている内部関数も、通常の利用APIと区別して記載。
+
+ライブラリのソース変更なし。このZIPは説明ファイルのみを含む。
+tests/bench_reference の2本は比較実験用で、通常はルートの本体を利用する。
+
+一覧:
+AVLtree.hpp → AVLtree.txt
+AhoCorasick.hpp → AhoCorasick.txt
+ArbitraryModBinomial.hpp → ArbitraryModBinomial.txt
+CRT.hpp → CRT.txt
+Cartesian Tree.hpp → Cartesian Tree.txt
+DSUontree.hpp → DSUontree.txt
+Dice.hpp → Dice.txt
+Diophantine.hpp → Diophantine.txt
+DyCon.hpp → DyCon.txt
+DynamicLiChaoTree.hpp → DynamicLiChaoTree.txt
+ErasablePriorityQueue.hpp → ErasablePriorityQueue.txt
+HLD_DP.hpp → HLD_DP.txt
+HLD_lazy.hpp → HLD_lazy.txt
+Hilbert Curve.hpp → Hilbert Curve.txt
+IntervalMap.hpp → IntervalMap.txt
+KMP.hpp → KMP.txt
+LCA eulor tour + sparse table.hpp → LCA eulor tour + sparse table.txt
+LCA ダブリング.hpp → LCA ダブリング.txt
+LazyLinkCutTree.hpp → LazyLinkCutTree.txt
+LinkCutTree.hpp → LinkCutTree.txt
+Mincostflow_with_Negative.hpp → Mincostflow_with_Negative.txt
+PointAddRectangleSum.hpp → PointAddRectangleSum.txt
+ProjectSelection.hpp → ProjectSelection.txt
+RectangleUnion.hpp → RectangleUnion.txt
+RollingHash.hpp → RollingHash.txt
+SA+LCP+RMQ.hpp → SA+LCP+RMQ.txt
+SegtreeBeats.hpp → SegtreeBeats.txt
+SlideminND.hpp → SlideminND.txt
+Static2Dsegtree.hpp → Static2Dsegtree.txt
+StaticLiChaoTree.hpp → StaticLiChaoTree.txt
+Tree.hpp → Tree.txt
+WaveletMatrix.hpp → WaveletMatrix.txt
+Weighted Union Find.hpp → Weighted Union Find.txt
+angle_sort.hpp → angle_sort.txt
+binarytrie.hpp → binarytrie.txt
+compress.hpp → compress.txt
+dynamic_connectivity_monoid.hpp → dynamic_connectivity_monoid.txt
+extend_gcd.hpp → extend_gcd.txt
+floor ceil.hpp → floor ceil.txt
+geometoric/geo_int.hpp → geometoric/geo_int.txt
+geometoric/geo_real.hpp → geometoric/geo_real.txt
+implicit_treap.hpp → implicit_treap.txt
+matrix +prod,pow.hpp → matrix +prod,pow.txt
+number-theory.hpp → number-theory.txt
+persistant_segtree.hpp → persistant_segtree.txt
+range_set.hpp → range_set.txt
+tests/bench_reference/binomial_forced_wide.hpp → tests/bench_reference/binomial_forced_wide.txt
+tests/bench_reference/binomial_original.hpp → tests/bench_reference/binomial_original.txt
+yuri.hpp → yuri.txt
+
+確認結果:
+・49本全ての使用例を、実際のtmp.cppに組み込んでC++20でコンパイル・実行。
+・49本全てでoj-bundle展開後にもコンパイル・実行。
+・小さな固定例のassert、およびHLDの入力例の出力を確認。
+・元ソースとtmp.cppの内容はSHA-256で変更がないことを確認。
+これは掲載例の確認であり、全てのAPI・入力の網羅的な検証ではない。

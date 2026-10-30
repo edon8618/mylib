@@ -1,0 +1,54 @@
+geo_int: 整数幾何
+対象: geometoric/geo_int.hpp / C++20
+
+【概要】
+点・線分・凸包・包含判定・直径・Minkowski和・最近点対。整数述語は厳密計算。
+
+【テンプレート引数】
+なし。geo_int::P の座標はll、内積・外積・二乗距離・面積2倍は__int128。
+
+【公開API】
+全て geo_int 名前空間。
+P{x,y}: +,-,単項-,整数倍、==,!=,<（座標辞書順）、入出力。
+dot(a,b),cross(a,b),cross(a,b,c),norm2(a),dist2(a,b)->i128。
+orient(a,b,c)->int: 左回り+1、同一直線0、右回り-1。
+onSegment(a,b,p)->bool / segmentsIntersect(a,b,c,d)->bool: 閉線分、接触込み。
+Poly=vector<P>。convexHull(Poly pts,bool keepCollinear=false)->Poly: CCW。
+area2(poly)->i128: 符号付き面積2倍。perimeter(poly)->long double。
+pointInPolygon(poly,p),pointInConvex(h,p)->int: 外0、境界1、内2。
+diameter2(h)->i128: 凸多角形の直径二乗。点が2個未満なら0。
+minkowskiSum(Poly a,Poly b)->Poly: 凸多角形の和、空入力は空。
+closestPair2(Poly pts)->optional<i128>: 最近点対の二乗距離、2点未満はnullopt。
+toString(i128)、abs128(i128)、gcd128(i128,i128)、sgn(i128)。
+
+【計算量】
+基本演算 O(1)。凸包・最近点対 O(Nlog N)、面積・周長・一般包含・直径 O(N)。
+凸包含 O(log N)、Minkowski和 O(N+M)。出力／作業領域は各入力サイズに線形。
+gcd128は値のビット長に比例する回数の互除法。
+
+【注意点】
+このヘッダーは内部で using ll/ld を定義するので、tmp.cppの #define ll/ld
+より前のinclude群で読み込む。ソースの書換えは不要。
+座標の加減算や差もllに、積と面積総和もi128に収める。最近点対の二乗距離は2^125未満。
+pointInConvex/diameter2/Minkowskiは冗長な一直線頂点のないCCW凸包を使う。
+convexHull(false)は全点一直線なら両端だけ、trueは境界の点も残す。
+perimeterは浮動小数点。2頂点では線分長の2倍になる。
+
+【内部実装用】
+公開ユーティリティは上記。convexHull/Minkowski/closestPair2 内のラムダ・バッファは内部用。
+
+【依存関係】
+単独ヘッダー。tmp.cppでは ll/ld マクロの定義前にincludeする。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/geometoric/geo_int.hpp"
+void solve(){
+    using geo_int::P;
+    vector<P> a = {{0,0},{2,0},{2,2},{0,2},{1,1}};
+    auto h = geo_int::convexHull(a);
+    assert(geo_int::area2(h) == 8 && geo_int::diameter2(h) == 8);
+    assert(geo_int::pointInConvex(h,{1,1}) == 2);
+    cout << geo_int::toString(geo_int::area2(h)) << '\n';
+}
+--- C++20 ここまで ---

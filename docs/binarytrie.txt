@@ -1,0 +1,44 @@
+BinaryTrie: XOR付き順序統計多重集合
+対象: binarytrie.hpp / C++20
+
+【概要】
+非負整数をビットtrieで管理。XORした後の順位・最小最大値を求める。
+
+【テンプレート引数】
+BinaryTrie<T=long long, MAX_LOG=60>。T は整数型。
+1<=MAX_LOG<=numeric_limits<T>::digits。値とXOR値は [0,2^MAX_LOG)。
+
+【公開API】
+insert(T val,int k=1): k個追加。erase(T val,int k=1): k個削除。
+count_exact(val)->int / size()->int。
+get_kth(int k,T xor_val=0)->T: XOR後の k 番目（0-indexed）の値。
+get_min(xor_val=0), get_max(xor_val=0): XOR後の最小／最大値。
+count_less_than(T x,T limit)->int: (登録値 XOR x)<limit の個数。
+
+【計算量】
+各操作 O(MAX_LOG)、size O(1)。異なる挿入経路の総数に比例する空間。
+最大で挿入した異なる値数 D に対し O(D MAX_LOG)。削除してもノードは残る。
+
+【注意点】
+erase は不足時に何も削除しない。k は非負で渡す（erase側に負数の検査なし）。
+get_* は空集合不可。get_kth の戻り値 XOR xor_val で元の登録値を復元可能。
+個数は int。
+
+【内部実装用】
+Node、nodes、root は内部状態。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/binarytrie.hpp"
+void solve(){
+    BinaryTrie<ll, 30> bt;
+    bt.insert(1); bt.insert(4); bt.insert(4);
+    assert(bt.get_min(3) == 2);
+    assert(bt.count_less_than(0, 4) == 1);
+    bt.erase(4);
+    cout << bt.get_kth(1) << '\n'; // 4
+}
+--- C++20 ここまで ---

@@ -1,0 +1,41 @@
+ErasablePriorityQueue: 遅延削除付き優先度キュー
+対象: ErasablePriorityQueue.hpp / C++20
+
+【概要】
+最大値または最小値を取り出しつつ、指定値を1個ずつ削除予約する。
+
+【テンプレート引数】
+ErasablePriorityQueue<T, Compare=less<T>>。既定は最大値優先。
+最小値優先は greater<T>。T は比較と == が使える型。
+
+【公開API】
+push(val) / erase(val): 1個追加／削除予約。
+pop(): 先頭1個を削除（空なら何もしない）。top()->T。
+empty()->bool / size()->size_t: 有効な要素数。
+
+【計算量】
+push/erase O(log P)。top/empty/pop は1回で溜まった削除を処理するため
+最悪 O(P log P)、各要素の掃除は1回で操作列全体では償却 O(log P)。
+size O(1)。P は内部に蓄積した要素数で、空間 O(P)。
+
+【注意点】
+存在する有効要素だけ erase する。存在しない値の予約は以後の結果を壊す。
+top は空で呼ばない。size は内部配列の長さの差で求める。
+
+【内部実装用】
+private pq / delayed_del / clean。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/ErasablePriorityQueue.hpp"
+void solve(){
+    ErasablePriorityQueue<ll> pq;
+    pq.push(3); pq.push(7); pq.push(7); pq.erase(7);
+    assert(pq.top() == 7 && pq.size() == 2);
+    pq.pop();
+    cout << pq.top() << '\n'; // 3
+}
+--- C++20 ここまで ---

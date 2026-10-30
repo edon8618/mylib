@@ -1,0 +1,34 @@
+floor / ceil: 符号付き整数除算
+対象: floor ceil.hpp / C++20
+
+【概要】
+負数を含む a/b の床・天井を整数のまま求める。
+
+【テンプレート引数】
+なし。引数・返り値は ll（tmp.cpp の long long）。
+
+【公開API】
+ll floor(ll a,ll b): 数学的な床。ll ceil(ll a,ll b): 数学的な天井。
+
+【計算量】
+各 O(1)、空間 O(1)。
+
+【注意点】
+b=0 は invalid_argument。LLONG_MIN/-1 は overflow_error。
+引数は整数2個。標準の小数版 floor/ceil とは別のオーバーロード。
+
+【内部実装用】
+外部向け補助関数なし。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/floor ceil.hpp"
+void solve(){
+    assert(floor(-7LL, 3LL) == -3);
+    assert(ceil(-7LL, 3LL) == -2);
+    cout << ceil(7LL, 3LL) << '\n'; // 3
+}
+--- C++20 ここまで ---

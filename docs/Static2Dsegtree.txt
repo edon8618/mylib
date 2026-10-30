@@ -1,0 +1,43 @@
+Static2DSegTree: 座標登録型2次元セグ木
+対象: Static2Dsegtree.hpp / C++20
+
+【概要】
+点の値を更新し、半開長方形内の集約をオンラインで求める。
+
+【テンプレート引数】
+Static2DSegTree<S,op,e,Coord=long long>。Coordは座標の順序付き型。
+S op(S,S), S e() はモノイド。2軸のまとめ方で順序が変わるため、
+通常は和・min・maxなどの可換モノイドを使用。非可換の順序を当てにしない。
+
+【公開API】
+Static2DSegTree(vector<pair<Coord,Coord>> pts): 全更新座標を登録、初期値e()。
+set(x,y,S val): 上書き。add(x,y,S val): op(現在値,val)。
+get(x,y)->S: 1点値。未登録ならe()。
+prod(min_x,max_x,min_y,max_y)->S: [min_x,max_x)×[min_y,max_y)。
+
+【計算量】
+登録点数N。構築 O(Nlog N) を上界に取れる。空間 O(Nlog N)。
+set/add/prod O(log^2(N+1))、get O(log(N+1))。S演算O(1)を仮定。
+
+【注意点】
+set/addの座標は全て事前登録。query境界の登録は不要。
+重複座標は1点に統合される。addは数値加算に限定されない。
+
+【内部実装用】
+private n/xs/ys/d/get_y_idx/inner_prod。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Static2Dsegtree.hpp"
+ll op(ll a,ll b){ return a+b; }
+ll e(){ return 0; }
+void solve(){
+    Static2DSegTree<ll,op,e> seg({{1,2},{3,4}});
+    seg.add(1,2,5); seg.set(3,4,7);
+    assert(seg.prod(0,4,0,5) == 12);
+    cout << seg.prod(0,3,0,5) << '\n'; // 5
+}
+--- C++20 ここまで ---

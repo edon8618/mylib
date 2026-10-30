@@ -1,0 +1,40 @@
+SegTreeBeats: 区間chmin/chmax/addと和
+対象: SegtreeBeats.hpp / C++20
+
+【概要】
+各要素の上限・下限による切り詰めと一括加算を処理する。
+
+【テンプレート引数】
+なし。値と和はll、添字はint。
+
+【公開API】
+SegTreeBeats(const vector<ll>& a)。
+apply_chmin(l,r,x): a[i]=min(a[i],x)。apply_chmax(l,r,x): max。
+apply_add(l,r,x): 加算。query_sum(l,r)->ll: 和。全て区間[l,r)。
+
+【計算量】
+構築・空間 O(N)。add/sumは O(log N)。chmin/chmaxは1回最悪 O(N)。
+混在した操作列の厳密な償却計算量は、この実装について未確認（不明）。
+単発のchmin/chmaxを常にO(log N)とは扱わない。
+
+【注意点】
+0<=l<=r<=N。値・中間値・タグを±2e18の番兵と衝突させず、和・積をllに収める。
+最大値・最小値を直接返す公開のクエリはない。
+
+【内部実装用】
+Node/dat/n/sz、add_val/update_chmin/update_chmax/push/updateと
+_apply_*/_query_sum は内部用（言語上public）。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/SegtreeBeats.hpp"
+void solve(){
+    SegTreeBeats seg(vl{1,5,9});
+    seg.apply_chmin(0,3,6); seg.apply_chmax(0,2,3); seg.apply_add(1,3,1);
+    assert(seg.query_sum(0,3) == 16); // 3,6,7
+    cout << seg.query_sum(0,3) << '\n';
+}
+--- C++20 ここまで ---

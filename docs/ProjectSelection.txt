@@ -1,0 +1,53 @@
+ProjectSelection / ProjectSelectionMulti: 燃やす埋める
+対象: ProjectSelection.hpp / C++20
+
+【概要】
+2値または順序付き多値の劣モジュラなコストを、最小カットで最小化する。
+
+【テンプレート引数】
+両方とも <Cap>。負コストや差分を持てる符号付き整数型（通常ll）。
+
+【公開API】
+ProjectSelection<Cap>(int n)。値0=S側、値1=T側。
+add_node(v,c0,c1): vの単項コスト。複数回登録は加算。
+add_penalty_01(u,v,w), add_penalty_10(u,v,w): 指定組合せへ非負罰則。
+add_pair(u,v,c00,c01,c10,c11): c00+c11<=c01+c10を満たすペアコスト。
+solve()->Cap: 最小コスト。get_assignment()->vector<int>: solve後の0/1の解。
+ProjectSelectionMulti<Cap>(vector<int> K,Cap inf_cap=1e15)。変数iは0..K[i]-1。
+add_unary_cost(u,vector<Cap> C): C.size()==K[u]。
+add_binary_cost(u,v,vector<vector<Cap>> M): K[u]×K[v]のMonge行列。
+  M[i][j]+M[i-1][j-1]<=M[i-1][j]+M[i][j-1]。
+solve()/get_assignment(): 最小コストと多値の割当て。
+
+【計算量】
+2値の登録1回 O(1)。多値の単項 O(K[u])、ペア O(K[u]K[v])。
+生成グラフをV頂点E辺として、一般の最大流の上界 O(V^2 E)、空間 O(V+E)。
+実用時間はグラフ構造に依存。割当て取得 O(V+E)。
+
+【注意点】
+全登録後にsolveを1回、その後にget_assignment。solveの2回目は残余流を
+継続するため、最初と同じ総コストが返るとは限らない。
+K[i]>=1。inf_capは有限コストの差を十分に上回り、総容量をCapに収める。
+デフォルト構築のProjectSelectionは直接solveせず、頂点数付きで作る。
+
+【内部実装用】
+graph/offset_cost/S/T、Multi.psp/K/start_idx/INF_CAP/idx は内部構築用。
+
+【依存関係】
+tmp.cpp の標準ライブラリ・ACL mf_graph と using namespace atcoder。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/ProjectSelection.hpp"
+void solve(){
+    ProjectSelection<ll> psp(2);
+    psp.add_node(0,0,3); psp.add_node(1,4,0);
+    psp.add_penalty_01(0,1,2);
+    assert(psp.solve() == 2);
+    assert((psp.get_assignment() == vi{0,1}));
+    ProjectSelectionMulti<ll> multi({3});
+    multi.add_unary_cost(0,vl{5,1,4});
+    assert(multi.solve() == 1 && multi.get_assignment()[0] == 1);
+    cout << psp.get_assignment()[1] << '\n'; // 1
+}
+--- C++20 ここまで ---

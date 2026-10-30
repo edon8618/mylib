@@ -1,0 +1,56 @@
+sparse_pow_mul
+
+【概要】
+f(x)^n * g(x)^m mod x^deg。疎な2多項式の積の冪を漸化式で計算。
+
+【公開API】
+fps sparse_pow_mul(const fps& f, ll n, const fps& g, ll m, int deg)
+戻り値は必ず長さdeg。入力は変更しない。
+n,mはlong long全範囲（LLONG_MINも可）。0乗は零多項式でも1。
+負の指数の底は定数項が非零であること。
+正の指数の零多項式は零を返す。deg=0は空列。
+
+【計算量】
+入力走査O(|f|+|g|)。くくり出し後の必要な非零項数をKf,Kg、
+P=Kf*Kg、残り出力長をD、積・微分積に残る非零項数の合計をKとする。
+O(|f|+|g|+P log(P+2)+D*(K+1)+log(|n|+2)+log(|m|+2))。
+K=O(min(P,D))。追加空間O(deg+Kf+Kg+min(P,D))。
+密な入力には向かない。長さが大きくても項数が少なければ利用可能。
+ここでは密な畳み込みを使わず、非零項の組を列挙する。
+
+【注意点・内部実装】
+0<=deg<998244353が必要。違反や負の指数で定数項0はinvalid_argument。
+deg=0でも前提違反は検査する。
+xの負の冪を相殺するようなローラン級数は扱わない。
+出力長だけメモリと時間が必要。積の項数は最大Kf*Kgに増える。
+内部用: sparse_pow_mul_detail::signed_power。直接呼ぶ必要はない。
+
+【依存関係・配置】
+qandori/cp-library の fps/fps.hpp を先に include する。
+係数型は qandori の mint (mod 998244353)、多項式型は fps。
+tmp.cppにACL版mintの別名定義があれば、この構成では除く（名前衝突）。
+このヘッダーには qandori の実装・include は含めない。
+例では qandori のルートを -I に渡し、自作ヘッダーも -I に渡す。
+C++20: g++ -std=c++20 -O2 -I/path/to/cp-library -I/path/to/addons main.cpp
+bundle: oj-bundle -I/path/to/cp-library -I/path/to/addons main.cpp > submit.cpp
+テンプレート引数はない。ACLのmintや別modのFPSはそのまま渡せない。
+例の ll・rep・using は tmp.cpp に既にあれば再定義不要。
+
+【使用例（C++20）】
+#include <bits/stdc++.h>
+#include "fps/fps.hpp"
+#include "sparse_pow_mul.hpp"
+using namespace std;
+using ll = long long;
+#define rep(i,n) for(ll i=0;i<(ll)(n);++i)
+
+void solve(){
+    auto f = sparse_pow_mul(fps{1,1},2,fps{1,-1},-1,5);
+    rep(i,f.size()) cout << f[i] << (i+1==(ll)f.size()?'\n':' ');
+    // 1 3 4 4 4
+}
+int main(){
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    solve();
+}

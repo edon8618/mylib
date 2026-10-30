@@ -1,0 +1,38 @@
+slide_min: 多次元スライド最小値
+対象: SlideminND.hpp / C++20
+
+【概要】
+vectorの入れ子の各軸について窓最小値を求める。
+
+【テンプレート引数】
+slide_min<NestedVec> は引数から推論。入れ子vectorの末端型は >= で比較可能。
+
+【公開API】
+NestedVec slide_min(const NestedVec& arr,const vector<ll>& window)。
+window[d] は軸dの窓幅。返却型は入力と同じで、各軸長は長さ-window[d]+1。
+
+【計算量】
+次元数D、入力要素数Mで O(DM+D^2) を上界とする（各軸で単調deque）。
+固定次元なら O(M)。空間 O(M) と入れ子vectorの管理領域。
+
+【注意点】
+矩形状の入れ子で、各軸が空でない入力を使う。window.size()==次元数。
+1<=window[d]<=軸長。実装はwindow<=1を無処理にするが、不正な窓幅は渡さない。
+平坦添字・要素数の積はintなので範囲に注意。
+
+【内部実装用】
+namespace SlideMinND の base_type/get_shape/flatten/resize_nested/build_nested。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/SlideminND.hpp"
+void solve(){
+    vector<vl> a = {{4,3,2},{1,5,6},{7,0,8}};
+    auto b = slide_min(a,{2,2});
+    assert((b == vector<vl>{{1,2},{0,0}}));
+    cout << b[0][0] << '\n'; // 1
+}
+--- C++20 ここまで ---

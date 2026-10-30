@@ -1,0 +1,49 @@
+nt: 素数判定・素因数分解・原始根
+対象: number-theory.hpp / C++20
+
+【概要】
+uint64_t 用 Miller–Rabin と乱択Pollard Rho。関数は namespace nt。
+
+【テンプレート引数】
+なし。nt::u64=uint64_t、nt::u128=__uint128_t。非負の ll はそのまま渡せる。
+
+【公開API】
+nt::mul_mod(a,b,mod)->u64: 128bit積の剰余。mod>0。
+nt::pow_mod(a,e,mod)->u64: a^e mod mod。mod>0。
+nt::is_prime(n)->bool: 7基底による64bit素数判定。
+nt::factor(n)->vector<u64>: 重複込み昇順。n<=1 は空。
+nt::factor_count(n)->vector<pair<u64,int>>: {素数,指数}。
+nt::distinct_prime_factors(n)->vector<u64>: 相異なる素因数の昇順列。
+nt::is_primitive_root(g,p[,pf])->bool: p は素数。
+  pf を渡す版では p-1 の相異なる素因数を全て渡す。
+nt::primitive_root(p)->u64: 2から順に探索（p=2なら1）。
+
+【計算量】
+mul_mod O(1)、pow_mod O(log(e+1))、is_prime O(log n) 回程度の固定幅演算。
+分解の厳密な最悪時間は不明（乱択リトライ）。一般にRhoに期待高速性があるが
+この実装の決定的時間保証はない。原始根判定は因数既知なら O(|pf| log p)。
+primitive_root は因数分解費用と試した候補数に依存。空間は因数と再帰深さに依存。
+
+【注意点】
+負数を渡さない。is_prime の64bit判定と factor の数値安全性は別。
+Rho の (mul_mod(x,x,n)+c) は uint64_t 加算なので、n>2^63 の領域では
+加算がラップし得る。分解に使う入力は非負 ll 範囲を推奨。
+素数でない p に原始根APIを使わない。
+
+【内部実装用】
+SplitMix64/rng、pollard_rho、factor_rec は分解用。直接呼ぶ必要なし。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/number-theory.hpp"
+void solve(){
+    assert(nt::is_prime(998244353));
+    auto fs = nt::factor(360);
+    assert((fs == vector<nt::u64>{2,2,2,3,3,5}));
+    assert(nt::is_primitive_root(3,998244353));
+    cout << fs.size() << '\n'; // 6
+}
+--- C++20 ここまで ---

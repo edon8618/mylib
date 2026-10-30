@@ -1,0 +1,53 @@
+LinkCutTree: 動的な森のパス集約
+対象: LinkCutTree.hpp / C++20
+
+【概要】
+辺の追加・削除と、頂点値のパス集約。非可換のopにも対応。
+
+【テンプレート引数】
+LinkCutTree<S,op,e>。S は値と集約の型、S op(S,S) は順序付きの結合演算、
+S e() は単位元。結合則が必要。rev_op は不要。
+
+【公開API】
+LinkCutTree(int n): 孤立したn頂点、初期値e()。
+link(u,v): 別成分なら接続。既に同成分なら何もしない。
+cut(u,v): 直接の辺を切る。指定辺がなければ何もしない。
+is_connected(u,v)->bool / find_root(v)->int。
+split(u,v): u→vのパスを露出。直後に get_prod(v)->S / get_sz(v)->int。
+get_kth(v,k)->int: 露出パスのuからk番目、0-indexed。
+set(v,S x) / get(v)->S: 頂点値。
+
+【計算量】
+構築 O(N)、通常の更新・検索は償却 O(log N)（splayなので1回の最悪はO(N)）。
+露出直後のget_prod/get_szはO(1)。空間 O(N)。S演算O(1)を仮定。
+
+【注意点】
+split前に同成分であることを確認。パスの両端頂点を含む。
+get_prod/get_sz/get_kth は補助splay木の状態を使うため、必要なsplitの直後に使う。
+get_kthもsplayを行うので、続けてパス情報が必要ならsplitし直す。
+find_rootの根はlink/splitで変わり、固定した根のLCA等は提供しない。
+
+【内部実装用】
+private Node/nodes/is_root/push_up/toggle/push_down/rotate/splay/access/
+make_root/get_kth_internal。公開splitはパス問い合わせの入口。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/LinkCutTree.hpp"
+ll op(ll a,ll b){ return a+b; }
+ll e(){ return 0; }
+void solve(){
+    LinkCutTree<ll,op,e> tree(3);
+    rep(i,3) tree.set(i,i+1);
+    tree.link(0,1); tree.link(1,2);
+    tree.split(0,2);
+    assert(tree.get_prod(2) == 6 && tree.get_sz(2) == 3);
+    tree.split(0,2);
+    assert(tree.get_kth(2,1) == 1);
+    tree.cut(1,2);
+    cout << tree.is_connected(0,2) << '\n'; // 0
+}
+--- C++20 ここまで ---

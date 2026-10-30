@@ -1,0 +1,46 @@
+persistent_segtree: 永続セグメント木
+対象: persistant_segtree.hpp / C++20
+
+【概要】
+1点更新で新しい版を作成し、どの版の値・集約も取得できる。遅延更新はない。
+
+【テンプレート引数】
+persistent_segtree<S,op,e>。S op(S,S) は順序付き結合、S e() は単位元。
+max_right/min_left の述語型Fは呼び出しから推論される。
+
+【公開API】
+persistent_segtree() / persistent_segtree(int n) / persistent_segtree(vector<S>)。
+初期版は0。version()->int: 最新版番号。
+set(int pos,S x,int ver=-1)->int: 指定版から更新した新しい版番号。
+get(pos,ver=-1)->S / prod(l,r,ver=-1)->S / all_prod(ver=-1)->S。
+max_right(l,predicate,ver=-1)->int / min_left(r,predicate,ver=-1)->int。
+関数ポインタをテンプレート引数にする max_right<f>(l,ver) 等もある。
+
+【計算量】
+構築 O(N)、set/get/prod/境界探索 O(log(N+1))、all_prod/version O(1)。
+U回更新後の空間 O(N+U log(N+1))。各S操作O(1)を仮定。
+
+【注意点】
+ver=-1は常に最新（set後は新しい版）。区間[l,r)。
+境界探索はpredicate(e())=true、区間を広げた時に真→偽となる単調性が必要。
+確保したNodeを解放するデストラクタがない。インスタンスを捨てても領域は残る。
+
+【内部実装用】
+private Node/roots/build/update/query/get_impl/max_right_dfs/min_left_dfs。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/persistant_segtree.hpp"
+ll op(ll a,ll b){ return a+b; }
+ll e(){ return 0; }
+void solve(){
+    persistent_segtree<ll,op,e> seg(vl{1,2,3});
+    ll v1 = seg.set(1,10,0);
+    assert(seg.prod(0,3,0) == 6 && seg.all_prod(v1) == 14);
+    assert(seg.max_right(0,[](ll sum){ return sum<=10; },v1) == 1);
+    cout << seg.all_prod(v1) << '\n';
+}
+--- C++20 ここまで ---

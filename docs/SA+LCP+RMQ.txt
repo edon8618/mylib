@@ -1,0 +1,44 @@
+SALCPRMQ: 接尾辞配列・LCP・部分文字列比較
+対象: SA+LCP+RMQ.hpp / C++20
+
+【概要】
+接尾辞の順序とLCPを前計算し、部分文字列比較とパターン検索を行う。
+
+【テンプレート引数】
+SALCPRMQ<T_string>。string や vector<int>/vector<ll>。
+検索関数の T_pattern はsize()/添字が使え、要素を対象と比較できる型。
+
+【公開API】
+SALCPRMQ(const T_string& s)。公開 sa: 辞書順に並んだ接尾辞の開始位置。
+isa[i]: 接尾辞iの順位、lcp[i]: 隣接する接尾辞間のLCP。
+get_lcp(i,j)->int: 接尾辞i,jのLCP長。
+compare_substr(l1,r1,l2,r2)->int: 半開部分文字列の比較、-1/0/1。
+lower_bound(pattern),upper_bound(pattern)->int: 前方一致するSA区間の両端。
+count_occurences(pattern)->int: 出現数（綴りはoccurences）。
+
+【計算量】
+構築はstringで O(Nlog N)、汎用vectorはACL内の座圧費用も含め O(Nlog N)。
+空間 O(Nlog N)。get_lcp/compare_substr O(1)、
+検索 O((|pattern|+1)log(N+1))。
+
+【注意点】
+対象は空でないもの。開始位置i,j,l1,l2は0..N-1で、末尾Nから始まる
+空部分文字列はこのAPIでは扱わない。検索パターンは非空。
+upper_bound は前方一致も「以下」に含める独自仕様。
+
+【内部実装用】
+SparseTable/st とその query はLCP用の内部RMQ。対象Sや配列を変更しない。
+
+【依存関係】
+tmp.cpp と ACL atcoder/string（ヘッダーからダブルクォートで読み込み）。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/SA+LCP+RMQ.hpp"
+void solve(){
+    SALCPRMQ<string> sa("banana");
+    assert(sa.get_lcp(1,3) == 3);
+    assert(sa.compare_substr(1,4,3,6) == 0);
+    cout << sa.count_occurences(string("ana")) << '\n'; // 2
+}
+--- C++20 ここまで ---

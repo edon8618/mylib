@@ -1,0 +1,58 @@
+UnionFindUndo / OfflineDynamicConnectivity: オフライン動的連結性
+対象: DyCon.hpp / C++20
+
+【概要】
+辺の有効期間を時間セグ木に載せ、巻き戻せるUnion-Findで各時刻の成分を処理する。
+
+【テンプレート引数】
+両方 <S,op,e>。S op(const S,const S), S e()。
+UF単独では結合順が併合順になる。成分の順序なし集約として使うなら
+opは結合的・可換であること。Sはコピーと既定構築が可能な型。
+
+【公開API】
+UnionFindUndo(int n=0,const vector<S>& init={})。
+find(v)->int、unite(u,v)->bool、comp_value(v)->S。
+prod_value(v,const S& val): 成分集約へop(現在値,val)。
+snapshot()->size_t、rollback_to(checkpoint): 記録位置まで巻き戻す。
+OfflineDynamicConnectivity(UF& uf,int Q): 時刻0..Q-1。
+insert(idx,u,v) / erase(idx,u,v): 辺の追加削除を時刻順に記録。
+prod_vertex_interval(a,b,v,val): 時刻[a,b)だけvに寄与val。
+prod(a,v,val): 時刻[a,Q)への寄与。
+build(): 辺の有効区間を確定。run(function<void(int)> f): 時刻順にf(idx)。
+コールバックではuf.find/comp_valueなどで現在の成分を読む。
+
+【計算量】
+UF.find/unite/prod_value/comp_value O(log N)、1操作のrollback O(1)。
+有効な辺・寄与の区間総数Iなら buildと登録 O(Ilog(Q+1))、
+run O(Ilog(Q+1)log(N+1)+Q+コールバック費用)。
+空間 O(N+Q+Ilog(Q+1))。辺記録のunordered_mapは期待時間。
+
+【注意点】
+重複辺は参照数を持ち、最後のeraseまで有効。存在しない辺をeraseしない。
+UFのinitは空か長さn。UFの寿命はODCより長くする。buildは1回だけ。
+run後にUFは実行前の状態へ戻る。寄与は値の代入ではなく追加。
+ロールバック中に任意の変更を加えると想定外になり得るためコールバックは参照用。
+
+【内部実装用】
+UF.Action/par/data/actions、ODC.Entry/seg/cnt/appear/pend/edge_key/
+add_interval と run の k,l,r引数は内部用（言語上public）。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/DyCon.hpp"
+ll op(ll a,ll b){ return a+b; }
+ll e(){ return 0; }
+void solve(){
+    UnionFindUndo<ll,op,e> uf(3,vl{1,2,3});
+    OfflineDynamicConnectivity<ll,op,e> dc(uf,3);
+    dc.insert(0,0,1); dc.insert(1,1,2); dc.erase(2,0,1);
+    dc.prod(1,2,10); dc.build();
+    vl ans(3);
+    dc.run([&](int t){ ans[t] = uf.comp_value(0); });
+    assert((ans == vl{3,16,1}));
+    for(ll x : ans) cout << x << '\n';
+}
+--- C++20 ここまで ---

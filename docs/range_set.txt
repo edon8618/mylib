@@ -1,0 +1,47 @@
+range_set: 整数の区間集合
+対象: range_set.hpp / C++20
+
+【概要】
+重なる区間と隣接区間をまとめ、被覆判定・追加削除・mexを扱う。
+
+【テンプレート引数】
+range_set<T>。T は符号付き整数型を使う。長さ・総長もT。
+
+【公開API】
+covered(l,r),covered(x)->bool: [l,r)／[x,x+1) が全て含まれるか。
+covered_by(l,r),covered_by(x)->pair<T,T>: 覆う区間、なければ{-TINF,-TINF}。
+insert(l,r),insert(x)->T: 増えた被覆長。erase(l,r),erase(x)->T: 減った被覆長。
+insert_ranges(l,r),insert_ranges(x): 新規追加部分のvector<pair<T,T>>。
+erase_ranges(l,r),erase_ranges(x): 実際に削除した部分の同型vector。
+mex(x=0)->T: x以上の最小未被覆整数。sum_all()->T: 被覆総長。
+size()->int: 区間数（要素数ではない）。get()->set<pair<T,T>>: コピー。
+dump(): 標準出力にデバッグ表示。
+
+【計算量】
+区間数K。判定・mex O(log(K+1))、更新は触れた区間数tに対し
+O((t+1)log(K+1))を上界として使用可能。size/sum_all O(1)。
+get O(K log(K+1))、dump O(K)。空間 O(K) と返却部分の領域。
+
+【注意点】
+半開区間、l<=r。空区間は増減0、coveredはtrue、covered_byは番兵。
+TINF=numeric_limits<T>::max()/2。端点とx+1を番兵の内側に収める。
+公開のsplit/kth機能はこの版にはない。
+
+【内部実装用】
+private TINF/sum/st。getで番兵は除かれる。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/range_set.hpp"
+void solve(){
+    range_set<ll> rs;
+    rs.insert(1,4); rs.insert(4,6);
+    assert(rs.size() == 1 && rs.sum_all() == 5);
+    rs.erase(2,3);
+    assert(rs.mex(1) == 2);
+    cout << rs.sum_all() << '\n'; // 4
+}
+--- C++20 ここまで ---

@@ -1,0 +1,55 @@
+LazyLinkCutTree: 動的な森のパス更新・集約
+対象: LazyLinkCutTree.hpp / C++20
+
+【概要】
+Link-Cut Treeに遅延作用を追加。頂点値をまとめて更新する。
+
+【テンプレート引数】
+LazyLinkCutTree<S,op,e,F,mapping,composition,id>。
+S op(S,S): 順序付き結合、S e(): 単位元。
+S mapping(F,S): 更新を単一頂点と区間集約の両方に適用。
+F composition(F f,F g): gの後にf。F id(): 恒等更新。
+作用はopへの分配と合成に整合すること。F は != で id() と比較できる型。
+例の区間加算・和では S={sum,len}、F=ll。rev_op は不要。
+
+【公開API】
+LazyLinkCutTree(int n): 初期値e()の孤立頂点。
+link/cut/is_connected/find_root/split/set/get/get_prod/get_sz/get_kth:
+LinkCutTreeと同じ名前・引数・返り値。
+apply(int u,int v,F f): u-vのパスの頂点（両端込み）に作用。
+
+【計算量】
+構築 O(N)、各更新・検索は償却 O(log N)、1回の最悪 O(N)。
+露出直後のget_prod/get_szは O(1)。空間 O(N)。各演算O(1)を仮定。
+
+【注意点】
+split/applyは同成分のu,vに使用。get_prod/get_sz/get_kthは必要なsplit直後。
+初期値e()のままでは例のlenが0なので、各頂点を{値,1}でsetする。
+Fに構造体を使う場合は ==/!= も定義。方向依存の作用は自動変換されない。
+
+【内部実装用】
+private Node/nodes/is_root/push_up/all_apply/toggle/push_down/rotate/
+splay/access/make_root/get_kth_internal。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/LazyLinkCutTree.hpp"
+struct S { ll sum,len; };
+using F = ll;
+S op(S a,S b){ return {a.sum+b.sum,a.len+b.len}; }
+S e(){ return {0,0}; }
+S mapping(F f,S x){ return {x.sum+f*x.len,x.len}; }
+F composition(F f,F g){ return f+g; }
+F id(){ return 0; }
+void solve(){
+    LazyLinkCutTree<S,op,e,F,mapping,composition,id> tree(3);
+    rep(i,3) tree.set(i,{i+1,1});
+    tree.link(0,1); tree.link(1,2); tree.apply(0,2,10);
+    tree.split(0,2);
+    assert(tree.get_prod(2).sum == 36);
+    cout << tree.get_prod(2).sum << '\n';
+}
+--- C++20 ここまで ---

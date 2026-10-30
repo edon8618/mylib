@@ -1,0 +1,48 @@
+AhoCorasick: 複数パターン照合
+対象: AhoCorasick.hpp / C++20
+
+【概要】
+辞書のパターンを一括で検索するオートマトン。受理IDは失敗辺の分もコピーされる。
+
+【テンプレート引数】
+AhoCorasick<char_size=26, base='a'>。文字 c は c-base に変換される。
+全入力文字が 0<=c-base<char_size を満たすこと。
+
+【公開API】
+AhoCorasick(): 根の状態番号は 0。
+insert(string s,int word_id): パターンと任意IDを追加。
+build(): 全 insert 後に1回だけ呼ぶ。
+step(int state,char c)->int: 次の状態番号。
+count_matches(int state)->int: この位置で終わるパターン登録数。
+nodes[state].accept: この位置で終わるID列。重複登録は重複して残る。
+
+【計算量】
+総文字数 L、状態数 V、文字種類数 C、全 accept 配列の合計サイズ A とする。
+insert 合計 O(L+VC)、build O(VC+A)、空間 O(VC+A)。
+step/count_matches O(1)、ID列挙は出力数分。A は O(V×パターン数) まで増え得る。
+
+【注意点】
+build 後の追加・再buildは不可。build前の step は存在しない遷移で -1 を返す。
+空パターンは失敗辺への伝播が一般の空文字照合仕様になっていないため避ける。
+
+【内部実装用】
+Node.next/fail と nodes の構築処理。accept は照合結果として参照してよい。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/AhoCorasick.hpp"
+void solve(){
+    AhoCorasick<> ac;
+    ac.insert("a", 0); ac.insert("ba", 1); ac.build();
+    ll state = 0, ans = 0;
+    for(char c : string("aba")){
+        state = ac.step(state, c);
+        ans += ac.count_matches(state);
+    }
+    assert(ans == 3);
+    cout << ans << '\n';
+}
+--- C++20 ここまで ---

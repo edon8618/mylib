@@ -1,0 +1,57 @@
+HLD / HeavyLightDP: 静的な木DPのパス合成
+対象: HLD_DP.hpp / C++20
+
+【概要】
+重い子への遷移を関数として持ち、同じHeavy Pathの関数を分割統治で合成する。
+
+【テンプレート引数】
+HeavyLightDP<Data,Func>。Data は部分木DP、Func は重い子への遷移。
+両型は vector(n) で初期化可能でmove/代入が使えること。
+MergeLight=function<Func(int,vector<Data>&)>: 頂点vとlight子の答え→vの遷移。
+MergePath=function<Func(Func,Func)>: 上側fと下側gから f(g(X)) を作る。
+Eval=function<Data(Func)>: 最下端の初期値を代入し部分木の答えを返す。
+MergePath は合成の結合則を満たすこと。HLD 自体にテンプレート引数はない。
+
+【公開API】
+HLD(int n)、add_edge(u,v)、build(root=0)。
+HLD.in/out/rev/head/parent/heavy_child/sz を参照可能。
+HeavyLightDP(HLD& hld,MergeLight ml,MergePath mp,Eval ev)。
+solve(root=0)->Data: 構築時の根を渡して木全体のDPを返す。
+
+【計算量】
+HLD構築 O(N)。solve は各頂点のmerge_light 1回、各パスのeval 1回、
+全体で O(N) 回以下のmerge_path。各演算がO(1)なら時間・空間 O(N)。
+FPS等の演算・コピー費用に依存する場合、この実装だけでは一律の計算量は不明。
+冒頭の O(N log^2 N) を全てのData/Funcに保証するものではない。
+
+【注意点】
+HLD.build はsz/timerをリセットしないので1回だけ。N>=1の木。DFSは再帰。
+HeavyLightDP はHLDを参照で保持するので先に破棄しない。
+ss の値や Func は内部で move されるため、過去の中間値の保持を当てにしない。
+
+【内部実装用】
+HLDのprivate dfs_sz/dfs_hld、HeavyLightDP.dc はパス配列の内部合成用
+（dcは言語上public）。dpの作業配列はsolve内。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/HLD_DP.hpp"
+struct Func { ll b; }; // f(x)=x+b
+void solve(){
+    HLD hld(3);
+    hld.add_edge(0,1); hld.add_edge(1,2); hld.build();
+    auto ml = [](int,vector<ll>& ss){
+        ll b = 1;
+        for(ll x : ss) b += x;
+        return Func{b};
+    };
+    auto mp = [](Func f,Func g){ return Func{f.b+g.b}; };
+    auto ev = [](Func f){ return f.b; }; // f(0)
+    HeavyLightDP<ll,Func> dp(hld,ml,mp,ev);
+    assert(dp.solve() == 3);
+    cout << dp.solve() << '\n';
+}
+--- C++20 ここまで ---

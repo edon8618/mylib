@@ -1,0 +1,51 @@
+product_of_polynomials
+
+【概要】
+複数の多項式の積。短いものから掛け合わせる。
+
+【公開API】
+fps product_of_polynomials(vector<fps> polys)
+入力は値渡し。通常は元の配列を変更しない。
+コピーを省くなら product_of_polynomials(move(polys))。以後polysの内容には依存しない。
+空の多項式列の積は {1}。空FPSを含む積は空FPS。
+それ以外は係数数の和 - 多項式数 + 1 の長さ。末尾0は削らない。
+
+【計算量】
+K=多項式数、L=入力係数数の総和とする。
+保守的上界 O((L+K) log(L+K+2) log(K+2))、空間 O(L+K)。
+定数多項式を大量に含む場合もLに数える。
+
+【注意点・内部実装】
+各乗算に必要なqandoriのNTT長を2^23以下に収める。
+巨大な配列サイズはintの範囲内。ラムダの比較関数と優先度付きキューは内部用。
+
+【依存関係・配置】
+qandori/cp-library の fps/fps.hpp を先に include する。
+係数型は qandori の mint (mod 998244353)、多項式型は fps。
+tmp.cppにACL版mintの別名定義があれば、この構成では除く（名前衝突）。
+このヘッダーには qandori の実装・include は含めない。
+例では qandori のルートを -I に渡し、自作ヘッダーも -I に渡す。
+C++20: g++ -std=c++20 -O2 -I/path/to/cp-library -I/path/to/addons main.cpp
+bundle: oj-bundle -I/path/to/cp-library -I/path/to/addons main.cpp > submit.cpp
+テンプレート引数はない。ACLのmintや別modのFPSはそのまま渡せない。
+例の ll・rep・using は tmp.cpp に既にあれば再定義不要。
+
+【使用例（C++20）】
+#include <bits/stdc++.h>
+#include "fps/fps.hpp"
+#include "product_of_polynomials.hpp"
+using namespace std;
+using ll = long long;
+#define rep(i,n) for(ll i=0;i<(ll)(n);++i)
+
+void solve(){
+    vector<fps> a{{1,1},{1,2},{3}};
+    auto f = product_of_polynomials(a);
+    rep(i,f.size()) cout << f[i] << (i+1==(ll)f.size()?'\n':' ');
+    // 3 9 6
+}
+int main(){
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    solve();
+}

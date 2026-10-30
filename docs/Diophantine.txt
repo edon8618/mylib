@@ -1,0 +1,36 @@
+Diophantine: 一次不定方程式の解の個数
+対象: Diophantine.hpp / C++20
+
+【概要】
+ax+by=c を満たす整数 (x,y) のうち、指定した長方形内の個数を数える。
+
+【テンプレート引数】
+なし。公開引数・返り値は ll、内部は __int128_t。
+
+【公開API】
+static ll Diophantine::count(a,b,c,lx,rx,ly,ry)。
+範囲は lx<=x<=rx, ly<=y<=ry の閉区間。a=b=0 も処理する。
+
+【計算量】
+a,bがともに非零なら O(log(min(|a|,|b|)+1))。片方0なら O(1)。
+再帰領域は互除法の深さ。
+
+【注意点】
+空範囲は0。解の個数が ll に収まらないと overflow_error。
+各解そのものの列挙・取得APIはない。
+
+【内部実装用】
+private W、floor_div/ceil_div/egcd/narrow。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Diophantine.hpp"
+void solve(){
+    ll ans = Diophantine::count(1,1,3,0,3,0,3);
+    assert(ans == 4);
+    cout << ans << '\n';
+}
+--- C++20 ここまで ---

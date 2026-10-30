@@ -1,0 +1,41 @@
+PointAddRectangleSum: 時系列の点加算・矩形和
+対象: PointAddRectangleSum.hpp / C++20
+
+【概要】
+操作列を先に登録し、各時点より前の点追加を矩形和へ反映するオフライン処理。
+
+【テンプレート引数】
+PointAddRectangleSum<C=long long,T=long long>。Cは座標。Tは重み・和で、
+0から構築、+=/-=、単項マイナスに対応する可換加法群（ll/mint等）。
+
+【公開API】
+add_point(C x,C y,T w): 点への加算を記録。
+add_query(C l,C r,C d,C u): [l,r)×[d,u) の矩形和を記録。
+solve()->vector<T>: add_query順の結果。返却まで個別の答えは取得しない。
+
+【計算量】
+全操作数M。登録は各償却O(1)、solve O(Mlog^2(M+1))、空間 O(M)。
+
+【注意点】
+矩形はl<=r,d<=uで渡す。点の重複は加算。
+solveは登録列を破壊しないので再計算できるが、毎回全操作を処理する。
+初期点は全クエリより先にadd_pointで登録。
+
+【内部実装用】
+private RawOp/Event/FenwickTree/ops/q_count、solve内のCDQ関数。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/PointAddRectangleSum.hpp"
+void solve(){
+    PointAddRectangleSum<ll,ll> ps;
+    ps.add_point(1,2,5); ps.add_query(0,4,0,5);
+    ps.add_point(3,4,7); ps.add_query(0,4,0,5);
+    auto ans = ps.solve();
+    assert((ans == vl{5,12}));
+    for(ll x : ans) cout << x << '\n';
+}
+--- C++20 ここまで ---

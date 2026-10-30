@@ -1,0 +1,39 @@
+ArbitraryModBinomial: 合成数modの二項係数
+対象: ArbitraryModBinomial.hpp / C++20
+
+【概要】
+mod を素数冪に分解し、各剰余をCRTで合成する。
+
+【テンプレート引数】
+なし。mod、n_max、n、r、返り値は ll。
+
+【公開API】
+ArbitraryModBinomial(ll m,ll n_max): m>0,n_max>=0。
+nCr(ll n,ll r)->ll: C(n,r) mod m。範囲外の n<0,r<0,r>n は0。
+
+【計算量】
+m=積 p_i^e_i、q_i=p_i^e_i、k=素数冪数。
+構築 O(sqrt(m)+Σmin(n_max,q_i)+k log m)、空間 O(Σmin(n_max,q_i)+Σe_i)。
+クエリ O(Σ(log(n+1)/log p_i + log q_i))（逆元の互除法を含む）。
+
+【注意点】
+各 min(n_max,q_i)>20000000 は runtime_error。n>n_max は invalid_argument
+（ただし m=1 や無効な n,r は先に0を返す）。
+全64bit範囲で中間値の安全性を保証する検査はない。極端に大きいmodは要検討。
+ファイル冒頭コメントの1引数構築ではなく、実装は2引数が必須。
+
+【内部実装用】
+private modinv、Barrett、BinomialModPe、fact_no_p、CRT係数・テーブル。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/ArbitraryModBinomial.hpp"
+void solve(){
+    ArbitraryModBinomial comb(12, 100);
+    assert(comb.nCr(5,2) == 10);
+    cout << comb.nCr(6,3) << '\n'; // 8
+}
+--- C++20 ここまで ---

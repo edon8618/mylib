@@ -1,0 +1,39 @@
+WeightedUnionFind: 差分制約付きUnion-Find
+対象: Weighted Union Find.hpp / C++20
+
+【概要】
+a[y]-a[x]=w を登録し、連結な頂点間の差を管理する。
+
+【テンプレート引数】
+なし。頂点数・頂点番号・重み差は ll。
+
+【公開API】
+WeightedUnionFind(ll n)
+find(x)->ll: 根。same(x,y)->bool。
+weight(x)->ll: a[x]-a[根]。
+unite(x,y,w)->bool: a[y]-a[x]=w で併合。既に同成分なら false。
+diff(x,y)->ll: a[y]-a[x]。
+
+【計算量】
+構築 O(N)、各操作は経路圧縮・rank併合で償却 O(α(N))。空間 O(N)。
+
+【注意点】
+既に同成分の unite は矛盾判定をしない。先に same と diff で確認する。
+異なる成分の diff に意味はない。差の加減算を ll に収める。
+
+【内部実装用】
+par/rank/diff_weight は内部状態。find は利用可能だが構造を変更する。
+
+【依存関係】
+tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/Weighted Union Find.hpp"
+void solve(){
+    WeightedUnionFind uf(3);
+    uf.unite(0,1,4); uf.unite(1,2,-1);
+    assert(uf.same(0,2) && uf.diff(0,2) == 3);
+    cout << uf.diff(0,2) << '\n';
+}
+--- C++20 ここまで ---
