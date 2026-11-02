@@ -21,7 +21,7 @@
  * - count_occurences(T): O(|T| log N)
  * 検索パターン T の元の配列内での出現回数を返す。
  */
-#include "atcoder/string"
+#include <atcoder/string>
 template <typename T_string>
 struct SALCPRMQ {
     int n;

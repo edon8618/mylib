@@ -29,7 +29,7 @@
  * tree.build_edge(0, init_S_edges);
  */
 #include <bits/stdc++.h>
-#include "atcoder/lazysegtree"
+#include <atcoder/lazysegtree>
 template<
     class S, S (*op)(S, S), S (*e)(),
     class F, S (*mapping)(F, S), F (*composition)(F, F), F (*id)(),
