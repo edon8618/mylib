@@ -3,7 +3,7 @@
 
 #include <bits/stdc++.h>
 using namespace std;
-#include "atcoder/all"
+#include <atcoder/all>
 using namespace atcoder;
 
 
@@ -115,7 +115,7 @@ using mint = modint998244353;//static_modint<998244353>
 //     return modrui(a*a%mod,b/2,mod)%mod;
 // }
 
-// void incr(vl &v,ll n){//　n進法
+// void incr(vl &v,ll n){// n進法
 //     ll k=v.size();
 //     v[k-1]++;
 //     ll now=k-1;
