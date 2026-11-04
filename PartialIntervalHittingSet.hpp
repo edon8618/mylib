@@ -53,6 +53,32 @@ public:
 
     int size() const { return (int)a_.size(); }
 
+    // Minimum number of points hitting ALL added intervals (including w=0).
+    // Right-endpoint greedy; NO min-cost flow. O(n log n) time, O(n) space.
+    // result.value is the minimum number of points, unlike solve(), where
+    // it denotes the maximum covered weight.
+    Result min_points_to_cover_all(bool restore = false) const {
+        Result result;
+        if (a_.empty()) return result;
+
+        auto sorted = a_;
+        sort(sorted.begin(), sorted.end(), [](const Interval& x, const Interval& y) {
+            if (x.r != y.r) return x.r < y.r;
+            return x.l < y.l;
+        });
+
+        optional<Coord> last;
+        for (const auto& it : sorted) {
+            // The previously chosen right endpoint is <= it.r.
+            if (!last || *last < it.l) {
+                last = it.r;
+                ++result.value;
+                if (restore) result.points.push_back(it.r);
+            }
+        }
+        return result;
+    }
+
     Result solve(int k, bool restore = false) const {
         assert(k >= 0);
         Result result;
