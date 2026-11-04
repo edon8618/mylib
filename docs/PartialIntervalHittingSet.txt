@@ -5,11 +5,13 @@ PartialIntervalHittingSet: 直線上の重み付き Partial Interval Hitting Set
 閉区間 [l_i, r_i] に非負整数重み w_i が付いている。
 直線上に高々 k 個の点を選び、「1点以上を含む」区間の重みの総和を最大化する。
 復元あり/なしを指定可能。重複区間や点区間 [x,x] に対応。
+全区間を刺すための最小点数も右端貪欲法で求められる（フローを使わない）。
 
 【公開API】
 template<class Coord = long long> struct PartialIntervalHittingSet
   void add(Coord l, Coord r, long long w = 1);
-    閉区間 [l,r] を追加。l<=r, w>=0 が必要。w=0 は無視される。
+    閉区間 [l,r] を追加。l<=r, w>=0 が必要。
+    w=0 は solve() では無視するが、min_points_to_cover_all() では被覆対象。
   int size() const;
     追加した区間の個数（w=0 もカウント）。
   Result solve(int k, bool restore = false) const;
@@ -19,7 +21,13 @@ template<class Coord = long long> struct PartialIntervalHittingSet
     restore=false では points は常に空。
     restore=true でも、必ずしも k 点ちょうどを返すわけではない。
     重複座標はなく、昇順で返る。復元される解は一意とは限らない。
-  solve() はデータを破壊せず、同じインスタンスから複数回呼べる。
+  Result min_points_to_cover_all(bool restore = false) const;
+    追加した全区間を刺すための最小点数を求める。重みは考慮せず w=0 も対象。
+    return.value  : long long 必要な最小点数（solve() の意味とは異なる）
+    return.points : vector<Coord> 最小点集合（restore=true の場合のみ）
+    右端の昇順に区間を処理して、直前の点で刺せなければ右端に点を置く。
+    フローは一切使わない。O(n log n) 時間、O(n) 空間。
+  solve() と min_points_to_cover_all() はデータを破壊せず、複数回呼べる。
 
 【依存関係】
 - 自分の mylib/Mincostflow_with_Negative.hpp
@@ -41,6 +49,11 @@ int main() {
     solver.add(2, 5);
     solver.add(4, 6, 2); // 重み 2
 
+    auto minimum = solver.min_points_to_cover_all(true);
+    cout << minimum.value << '\n'; // 2
+    for (auto p : minimum.points) cout << p << ' ';
+    cout << '\n';
+
     auto a = solver.solve(1);
     cout << a.value << '\n'; // 3
 
@@ -49,6 +62,11 @@ int main() {
     for (auto p : b.points) cout << p << ' ';
     cout << '\n';
 }
+
+【最小点数版】
+min_points_to_cover_all() は区間を右端の昇順にソートし、現在の点で刺せない
+区間に遭遇したらその区間の右端を採用する。各点の復元もそのまま可能。
+MCFやSPFAは呼ばない。重み w=0 の区間も対象。
 
 【内部アルゴリズム】
 重み合計 W を計算し、候補座標として全区間の右端を座標圧縮する。
