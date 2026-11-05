@@ -1,0 +1,108 @@
+FunctionalGraph: functional graph のジャンプ・経路集約
+対象: FunctionalGraph.hpp / C++20
+
+【概要】
+各頂点から出る辺がちょうど1本の有向グラフで、f^t(v) と遷移中の重み集約を扱う。
+サイクルと逆木に分解し、long-path ladder と短いダブリングでオンライン jump O(1)。
+重みなしの本体と、和・最大値・最小値・一般モノイドの追加構造を分けている。
+
+【テンプレート引数】
+FunctionalGraph: なし。to は vector<int>、頂点は 0-indexed。
+FunctionalGraphSum<T>: 和を計算。T は T{}=0、+、-、T * unsigned long long が必要。
+FunctionalGraphMax<T> / FunctionalGraphMin<T>: max/min を計算。T は比較可能。
+FunctionalGraphMonoid<M>: M::S（値の型）、M::op(a,b)、M::e() が必要。
+  M::op は結合法則を満たし、M::e() は両側単位元。非可換でもよい。
+  任意で M::repeat(const S&, unsigned long long) を定義可能。
+
+【公開API】
+FunctionalGraph(vector<int> to) / build(vector<int> to): グラフ構築。
+jump(int v, unsigned long long t)->int: f^t(v)。t=0 なら v。
+ancestor(int v, int steps)->int: サイクル到達前を含む steps 回の遷移。
+  0<=steps<=distance_to_cycle(v) が必要。
+distance_to_cycle(v)->int: 最初にサイクルへ入るまでの移動回数。
+entry_vertex(v)->int: 最初に到達するサイクル上の頂点。
+cycle_length(v)->int: 到達するサイクルの長さ。
+on_cycle(v)->bool: v がサイクル上か。cycles()->int: サイクルの個数。
+
+重み w[v] は v から次へ移動するときに1回消費する（頂点重み／出辺重み）。
+fold(u,t) は w[u],w[f(u)],...,w[f^(t-1)(u)] の t 個を順に集約する。
+到着頂点 f^t(u) の重みは含まない。t=0 の場合は空列の単位元を返す。
+
+FunctionalGraphSum<T>(const FunctionalGraph& fg,const vector<T>& w): 構築。
+sum(u,t), fold(u,t)->T: 経路和。t=0 は T{}（0）。
+jump(u,t)->int / jump_fold(u,t)->pair<int,T>: 到着頂点／到着頂点と和。
+
+FunctionalGraphMax<T>(fg,w,id=lowest<T>()): 構築。
+max(u,t), extreme(u,t), fold(u,t)->T: 最大値。t=0 は id。
+FunctionalGraphMin<T>(fg,w,id=max<T>()): 構築。
+min(u,t), extreme(u,t), fold(u,t)->T: 最小値。t=0 は id。
+両者とも jump(u,t)->int / jump_fold(u,t)->pair<int,T> が使える。
+
+FunctionalGraphMonoid<M>(fg,w): 構築。w は vector<M::S>。
+fold(u,t)->M::S: 歩く順序を保って op で集約。t=0 は M::e()。
+jump(u,t)->int / jump_fold(u,t)->pair<int,M::S> も使える。
+M::repeat(x,k) があればサイクル全周 k 回分の集約に利用する。
+省略時は二分累乗で M::op を O(log k) 回呼ぶ。
+
+【計算量】
+N=頂点数、D=サイクル外の最大距離、L=max(1,ceil(log2(D+1)))。
+FunctionalGraph: 構築 O(NL)、空間 O(NL)、jump/ancestor と各種情報取得 O(1)。
+FunctionalGraphSum<T>: 追加構築 O(N)、追加空間 O(N)、sum/fold/jump_fold O(1)。
+FunctionalGraphMax/Min<T>: 追加構築 O(NL+(N/64)log(N/64))、
+  追加空間 O(NL+N+(N/64)log(N/64))、max/min/fold/jump_fold O(1)。
+FunctionalGraphMonoid<M>: 追加構築 O(NL+N)、追加空間 O(NL+N)、
+  fold/jump_fold O(L+log N+log t)（repeat が O(1) なら O(L+log N)）。
+いずれの重み付き構造でも、単なる jump は本体を使い O(1)。
+
+【注意点】
+N>=1、全頂点で 0<=to[v]<N。静的グラフ専用（辺の更新不可）。
+各クエリの t は unsigned long long の範囲内。0-indexed。
+重み付き構造は fg をポインタ参照するので、fg を先に破棄・移動・再構築しない。
+重み付き構造の build は前計算し直す。重み配列は構築後に変更しても反映されない。
+和は T でオーバーフローしないこと。巨大な t では __int128_t 等も検討する。
+max/min の空列の既定値は numeric_limits<T>::lowest()/max()。
+独自の単位元が必要ならコンストラクタ第3引数で渡す。
+非可換モノイドは M::op(a,b) の順番を歩く順番に合わせる。
+最適化された sum/max/min と異なり、一般モノイド集約は O(1) ではない。
+
+【内部実装用】
+FunctionalGraph の to/depth/entry/cycle_id/cycle_pos/cycle_begin/cycle_vertices は公開配列。
+up/ladder/ladder_index は O(1) 祖先取得用。直接変更しない。
+FunctionalGraphRMQ および FunctionalGraphExtreme は max/min の内部実装。
+必要なときだけ重み付き構造を生成すれば、未使用の集約用領域は確保されない。
+
+【依存関係】
+標準ヘッダーのみ（hpp は bits/stdc++.h を含む）。外部ライブラリなし。
+GNU C++20 以降（__builtin_clz / __builtin_ctzll、requires 式を使用）。
+
+【使用例（C++20）】
+--- C++20 ここから ---
+#include "mylib/FunctionalGraph.hpp"
+void solve(){
+    vi to = {1,2,3,2,0};
+    FunctionalGraph fg(to);
+    assert(fg.jump(4,3) == 2);
+    assert(fg.jump(4,1000000000000000000ULL) == 3);
+    assert(fg.distance_to_cycle(4) == 3);
+    assert(fg.entry_vertex(4) == 2 && fg.cycle_length(4) == 2);
+
+    vl w = {1,3,5,7,11};
+    FunctionalGraphSum<ll> fs(fg,w);
+    auto [v,s] = fs.jump_fold(4,3);
+    assert(v == 2 && s == 15);
+
+    FunctionalGraphMax<ll> fm(fg,w);
+    FunctionalGraphMin<ll> fn(fg,w);
+    assert(fm.max(4,3) == 11 && fn.min(4,3) == 1);
+
+    struct M {
+        using S = string;
+        static S op(const S& a,const S& b){ return a+b; }
+        static S e(){ return ""; }
+    };
+    vector<string> letters = {"a","b","c","d","e"};
+    FunctionalGraphMonoid<M> fmon(fg,letters);
+    assert(fmon.fold(4,4) == "eabc");
+    cout << fg.jump(4,3) << '\n'; // 2
+}
+--- C++20 ここまで ---
