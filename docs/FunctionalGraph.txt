@@ -7,7 +7,7 @@ FunctionalGraph: functional graph のジャンプ・経路集約
 重みなしの本体と、和・最大値・最小値・一般モノイドの追加構造を分けている。
 
 【テンプレート引数】
-FunctionalGraph: なし。to は vector<int>、頂点は 0-indexed。
+FunctionalGraph: なし。to は vector<int> / vector<long long> などの整数vector、頂点は 0-indexed。
 FunctionalGraphSum<T>: 和を計算。T は T{}=0、+、-、T * unsigned long long が必要。
 FunctionalGraphMax<T> / FunctionalGraphMin<T>: max/min を計算。T は比較可能。
 FunctionalGraphMonoid<M>: M::S（値の型）、M::op(a,b)、M::e() が必要。
@@ -15,7 +15,8 @@ FunctionalGraphMonoid<M>: M::S（値の型）、M::op(a,b)、M::e() が必要。
   任意で M::repeat(const S&, unsigned long long) を定義可能。
 
 【公開API】
-FunctionalGraph(vector<int> to) / build(vector<int> to): グラフ構築。
+FunctionalGraph(vector<Int> to) / build(vector<Int> to): グラフ構築。
+  vi / vl の両方に対応。内部は int で保持する（vl入力は構築時に変換）。
 jump(int v, unsigned long long t)->int: f^t(v)。t=0 なら v。
 ancestor(int v, int steps)->int: サイクル到達前を含む steps 回の遷移。
   0<=steps<=distance_to_cycle(v) が必要。
@@ -28,17 +29,20 @@ on_cycle(v)->bool: v がサイクル上か。cycles()->int: サイクルの個�
 fold(u,t) は w[u],w[f(u)],...,w[f^(t-1)(u)] の t 個を順に集約する。
 到着頂点 f^t(u) の重みは含まない。t=0 の場合は空列の単位元を返す。
 
-FunctionalGraphSum<T>(const FunctionalGraph& fg,const vector<T>& w): 構築。
+FunctionalGraphSum<T>(const FunctionalGraph& fg,const vector<U>& w): 構築。
+  U が T に暗黙変換できれば vi / vl どちらでもよい。build(fg,w) も同様。
 sum(u,t), fold(u,t)->T: 経路和。t=0 は T{}（0）。
 jump(u,t)->int / jump_fold(u,t)->pair<int,T>: 到着頂点／到着頂点と和。
 
 FunctionalGraphMax<T>(fg,w,id=lowest<T>()): 構築。
+  w は vector<T> または T に暗黙変換可能な要素の vector（vi / vl 対応）。
 max(u,t), extreme(u,t), fold(u,t)->T: 最大値。t=0 は id。
 FunctionalGraphMin<T>(fg,w,id=max<T>()): 構築。
+  build(fg,w,id) も同様に vi / vl に対応。
 min(u,t), extreme(u,t), fold(u,t)->T: 最小値。t=0 は id。
 両者とも jump(u,t)->int / jump_fold(u,t)->pair<int,T> が使える。
 
-FunctionalGraphMonoid<M>(fg,w): 構築。w は vector<M::S>。
+FunctionalGraphMonoid<M>(fg,w): 構築。w は vector<M::S> または M::S に暗黙変換可能な要素の vector。
 fold(u,t)->M::S: 歩く順序を保って op で集約。t=0 は M::e()。
 jump(u,t)->int / jump_fold(u,t)->pair<int,M::S> も使える。
 M::repeat(x,k) があればサイクル全周 k 回分の集約に利用する。
@@ -56,6 +60,8 @@ FunctionalGraphMonoid<M>: 追加構築 O(NL+N)、追加空間 O(NL+N)、
 
 【注意点】
 N>=1、全頂点で 0<=to[v]<N。静的グラフ専用（辺の更新不可）。
+vl からの頂点番号は int に安全に収まることを検証して変換する。
+異なる型の重みvectorは構築時に要素変換される（クエリ速度に影響なし）。
 各クエリの t は unsigned long long の範囲内。0-indexed。
 重み付き構造は fg をポインタ参照するので、fg を先に破棄・移動・再構築しない。
 重み付き構造の build は前計算し直す。重み配列は構築後に変更しても反映されない。
@@ -79,8 +85,10 @@ GNU C++20 以降（__builtin_clz / __builtin_ctzll、requires 式を使用）。
 --- C++20 ここから ---
 #include "mylib/FunctionalGraph.hpp"
 void solve(){
-    vi to = {1,2,3,2,0};
-    FunctionalGraph fg(to);
+    vl to = {1,2,3,2,0};
+    FunctionalGraph fg(to);  // vl でもよい
+    vi to2 = {1,2,3,2,0};
+    fg.build(to2);           // vi でもよい
     assert(fg.jump(4,3) == 2);
     assert(fg.jump(4,1000000000000000000ULL) == 3);
     assert(fg.distance_to_cycle(4) == 3);
@@ -88,6 +96,9 @@ void solve(){
 
     vl w = {1,3,5,7,11};
     FunctionalGraphSum<ll> fs(fg,w);
+    vi wi = {1,3,5,7,11};
+    FunctionalGraphSum<ll> fs2(fg,wi); // int -> ll も可
+    assert(fs2.sum(4,3) == 15);
     auto [v,s] = fs.jump_fold(4,3);
     assert(v == 2 && s == 15);
 
