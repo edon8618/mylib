@@ -13,6 +13,25 @@ struct FunctionalGraph {
 
     FunctionalGraph()=default;
     explicit FunctionalGraph(std::vector<int> successor) { build(std::move(successor)); }
+    template<class Int>
+        requires(std::is_integral_v<Int> && !std::is_same_v<Int,int>)
+    explicit FunctionalGraph(const std::vector<Int>& successor) { build(successor); }
+
+    // Keep vector<int> zero-copy for rvalues; accept vector<long long> etc. at build time.
+    template<class Int>
+        requires(std::is_integral_v<Int> && !std::is_same_v<Int,int>)
+    void build(const std::vector<Int>& successor) {
+        const auto size=successor.size();
+        assert(size>=1 && size<=(size_t)std::numeric_limits<int>::max());
+        std::vector<int> converted;
+        converted.reserve(size);
+        for(Int x:successor) {
+            // Check before narrowing: invalid 64-bit vertex IDs must not wrap.
+            assert(x>=0 && (std::uintmax_t)x<size);
+            converted.push_back((int)x);
+        }
+        build(std::move(converted));
+    }
 
     void build(std::vector<int> successor) {
         to=std::move(successor);
@@ -133,6 +152,14 @@ struct FunctionalGraphSum {
     std::vector<T> tree_sum, cycle_prefix, cycle_total;
     FunctionalGraphSum()=default;
     FunctionalGraphSum(const FunctionalGraph& graph, const std::vector<T>& w) { build(graph,w); }
+    template<class U>
+        requires(std::is_convertible_v<U,T> && !std::is_same_v<U,T>)
+    FunctionalGraphSum(const FunctionalGraph& graph,const std::vector<U>& w) { build(graph,w); }
+    template<class U>
+        requires(std::is_convertible_v<U,T> && !std::is_same_v<U,T>)
+    void build(const FunctionalGraph& graph,const std::vector<U>& w) {
+        build(graph,std::vector<T>(w.begin(),w.end()));
+    }
     void build(const FunctionalGraph& graph,const std::vector<T>& w) {
         fg=&graph;
         assert((int)w.size()==fg->n);
@@ -263,6 +290,15 @@ struct FunctionalGraphExtreme {
     std::vector<T> cycle_extreme;
     FunctionalGraphExtreme(const FunctionalGraph& graph,const std::vector<T>& w,
         T id=IsMax?std::numeric_limits<T>::lowest():std::numeric_limits<T>::max()) { build(graph,w,id); }
+    template<class U>
+        requires(std::is_convertible_v<U,T> && !std::is_same_v<U,T>)
+    FunctionalGraphExtreme(const FunctionalGraph& graph,const std::vector<U>& w,
+        T id=IsMax?std::numeric_limits<T>::lowest():std::numeric_limits<T>::max()) { build(graph,w,id); }
+    template<class U>
+        requires(std::is_convertible_v<U,T> && !std::is_same_v<U,T>)
+    void build(const FunctionalGraph& graph,const std::vector<U>& w,T id) {
+        build(graph,std::vector<T>(w.begin(),w.end()),id);
+    }
     T merge(const T& a,const T& b) const {
         if constexpr(IsMax)return std::max(a,b);
         else return std::min(a,b);
@@ -342,6 +378,14 @@ struct FunctionalGraphMonoid {
     std::vector<S> cycle_seg;
     FunctionalGraphMonoid()=default;
     FunctionalGraphMonoid(const FunctionalGraph& graph,const std::vector<S>& w) { build(graph,w); }
+    template<class U>
+        requires(std::is_convertible_v<U,S> && !std::is_same_v<U,S>)
+    FunctionalGraphMonoid(const FunctionalGraph& graph,const std::vector<U>& w) { build(graph,w); }
+    template<class U>
+        requires(std::is_convertible_v<U,S> && !std::is_same_v<U,S>)
+    void build(const FunctionalGraph& graph,const std::vector<U>& w) {
+        build(graph,std::vector<S>(w.begin(),w.end()));
+    }
     void build(const FunctionalGraph& graph,const std::vector<S>& w) {
         fg=&graph;
         assert((int)w.size()==fg->n);
