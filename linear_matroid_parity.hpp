@@ -670,10 +670,10 @@ std::vector<int> recover(int d,int m,Source& src,const SkewMatrix<Mint>& h,
                 std::vector<std::uint32_t> uv(r),vv(r);
                 for(int i=0;i<r;i++){uv[i]=u[i].val();vv[i]=v[i].val();}
                 for(int i=0;i<r;i++){
-                    const std::uint64_t ui=uv[i],vi=vv[i];
+                    const std::uint64_t ui=uv[i],v_i=vv[i];
                     Mint* row=iv.v.data()+(std::size_t)i*r;
                     for(int j=i+1;j<r;j++){
-                        std::uint64_t z=vi*uv[j]+mod2-ui*vv[j]+row[j].val();
+                        std::uint64_t z=v_i*uv[j]+mod2-ui*vv[j]+row[j].val();
                         Mint val=from_reduced_u32<Mint>((std::uint32_t)(z%mod));
                         row[j]=val;
                         iv.v[(std::size_t)j*r+i]=-val;
