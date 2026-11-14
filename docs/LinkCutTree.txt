@@ -1,53 +1,173 @@
-LinkCutTree: 動的な森のパス集約
-対象: LinkCutTree.hpp / C++20
+LinkCutTree: 頂点値・方向付き辺値を持つ動的な森
+対象: LinkCutTree.hpp / C++17以降（テストはC++20）
 
 【概要】
-辺の追加・削除と、頂点値のパス集約。非可換のopにも対応。
+辺の追加・削除、非可換モノイドの経路積、経路の頂点・辺の位置を扱う。
+頂点と辺に同じ型Sの値を同時に載せられる。内部辺ノードの管理は不要。
+新規コードは prod(u,v) を使う。split/get_prod は既存コードとの互換用。
 
 【テンプレート引数】
-LinkCutTree<S,op,e>。S は値と集約の型、S op(S,S) は順序付きの結合演算、
-S e() は単位元。結合則が必要。rev_op は不要。
+LinkCutTree<S,op,e>
+S op(S a,S b): a、b の順に通過するときの合成。
+S e(): 両側単位元。opには結合則が必要。可換性・逆元・除法は不要。
+Sはコピー・代入・swap可能な型。等値比較やデフォルト構築は要求しない。
+頂点値は方向によらず同じ。辺値は順逆の2値を持つ。
 
 【公開API】
-LinkCutTree(int n): 孤立したn頂点、初期値e()。
-link(u,v): 別成分なら接続。既に同成分なら何もしない。
-cut(u,v): 直接の辺を切る。指定辺がなければ何もしない。
-is_connected(u,v)->bool / find_root(v)->int。
-split(u,v): u→vのパスを露出。直後に get_prod(v)->S / get_sz(v)->int。
-get_kth(v,k)->int: 露出パスのuからk番目、0-indexed。
-set(v,S x) / get(v)->S: 頂点値。
+LinkCutTree(int n)
+  n>=0。0..n-1の孤立頂点を作る。初期頂点値はe()。
+
+link(int u,int v)->void
+  両方向e()の辺を追加する。内部的に辺IDも割り当てる。
+  旧仕様を維持し、既に同じ成分（u==vを含む）なら何もしない。
+link_edge(int u,int v,S f,S g)->int
+  異なる成分のu,vを接続。u→vがf、v→uがg。辺IDを返す。
+  基準方向は開設時のu→vで、削除まで変わらない。
+cut(int u,int v)->void
+  直接結ぶ辺を削除。端点の順序不問。辺がなければ何もしない。
+cut_edge(int id)->void
+  生存する辺IDを削除する。
+get_edge_id(int u,int v)->int
+  直接結ぶ辺のID。端点の順序不問。なければ-1。
+is_connected(int u,int v)->bool
+  同じ連結成分か。u==vならtrue。
+find_root(int v)->int
+  現在の木の根の頂点番号。内部辺ノードは返さない。
+  根は固定ではなく、link/cut/split/prod等で変化する。
+
+set(int v,S x)->void / get(int v)->S
+  頂点の値を更新／取得。
+set_edge(int id,S x)->void
+  基準方向と逆方向をともにxへ更新。
+set_edge(int id,S f,S g)->void
+  開設時の基準方向をf、逆方向をgへ更新。
+set_edge(int u,int v,S f,S g)->void
+  u→vをf、v→uをgへ更新。基準方向そのものは変更しない。
+get_edge(int id)->pair<S,S>
+  開設時の基準方向、逆方向の順に返す。
+get_edge(int u,int v)->pair<S,S>
+  u→v、v→uの順に返す。直前の経路照会方向には依存しない。
+  更新・取得の辺は生存していること。存在しない辺には使用しない。
+
+prod(int u,int v)->S
+  連結が前提。uからvへの頂点・辺を通過順に合成する。
+  u--e0--w--e1--vなら、value[u]*value[e0,u→w]*value[w]*value[e1,w→v]*value[v]。
+  両端頂点を含み、prod(v,v)==get(v)。事前splitは不要。
+try_prod(int u,int v)->optional<S>
+  同じ経路積。非連結ならnullopt。連結判定のための再splitを行わない。
+vertex_count(int u,int v)->int / edge_count(int u,int v)->int
+  経路の元の頂点数／辺数（常に辺数=頂点数-1）。連結が前提。
+kth_vertex(int u,int v,int k)->int
+  uから0-basedでk番目の元の頂点番号。
+kth_edge(int u,int v,int k)->int
+  uから0-basedでk番目の辺ID。内部ノード番号ではない。
+  連結かつ 0<=k<vertex_count / edge_count が前提。
+
+【旧API・互換性】
+split(int u,int v)->void
+  連結が前提。u→vの経路を露出し、vを補助木の根にする。
+get_prod(int v)->S / get_sz(int v)->int / get_kth(int v,int k)->int
+  split(u,v)直後の経路積／元の頂点数／k番目の元の頂点。
+  辺ノードをget_szで数えず、get_kthで返さない。
+  get_prod/get_szは読み取りのみ。get_kthはsplayするため経路抽出状態を変える。
+  get/get_edge/set/find_root等も補助木の状態を変えることがある。
+  状態を変える操作を挟んだら、必要に応じてsplitし直す。
+  頂点用の旧公開APIはすべて維持。通常linkの同成分時、cutの辺なし時のno-opも維持。
 
 【計算量】
-構築 O(N)、通常の更新・検索は償却 O(log N)（splayなので1回の最悪はO(N)）。
-露出直後のget_prod/get_szはO(1)。空間 O(N)。S演算O(1)を仮定。
+Sの演算・コピーをO(1)とする。N=頂点数、A=これまで成功した辺追加回数。
+構築O(N)、空間O(N+A)。生存辺は最大N-1、内部辺ノードは再利用する。
+削除済みIDを再利用しないため、IDの履歴領域はO(A)必要。
+get_edge_id: ハッシュテーブルの期待O(1)。get_prod/get_sz: O(1)。
+それ以外の更新・経路操作・根・値取得: 原則償却O(log(max(2,N)))。
+link/link_edge/cut/cut_edgeには期待O(1)のハッシュ操作を含む。
+vectorの拡張コストも償却評価。1回のsplayの最悪時間はO(N)。
+ハッシュ衝突の最悪時は線形。厳密な最悪O(log N)保証ではない。
+
+【頂点番号・辺ID・前提条件】
+全頂点引数は0<=v<N。辺IDは成功した追加ごとに0から増えるint。
+削除済みIDは他の辺を指さない。同じ端点の再追加も新しいIDとなる。
+IDを受け取らないlinkでもget_edge_idで取得でき、後から値を付けられる。
+削除済み／存在しないIDによる操作は前提違反（assert有効時に検出）。
+N、内部ノード数、累積辺追加数はintで表現できる範囲で使う。
+link_edgeは異なる成分が前提。同成分に追加すると不正な森になる。
+有効な入力以外の包括的な検査は行わない。
 
 【注意点】
-split前に同成分であることを確認。パスの両端頂点を含む。
-get_prod/get_sz/get_kth は補助splay木の状態を使うため、必要なsplitの直後に使う。
-get_kthもsplayを行うので、続けてパス情報が必要ならsplitし直す。
-find_rootの根はlink/splitで変わり、固定した根のLCA等は提供しない。
+link_edge(u,v,x)は提供しない。同値ならlink_edge(u,v,x,x)。
+端点指定set_edge(u,v,x)も提供しない。同値ならset_edge(u,v,x,x)。
+ただしS=intの場合、3引数set_edge(u,v,x)という式自体はID指定
+set_edge(id,f,g)としてコンパイルされる。端点指定のつもりで書かないこと。
+flip_edge等は提供しない。交換はget_edge(id)の結果を逆順にset_edge(id,g,f)。
+経路への遅延作用、頂点のみ／辺のみの別集約は提供しない。
+頂点だけ使う場合はlink、辺だけ使う場合は頂点値をe()のままにする。
+find_rootが返す根は旧版と常に一致するとは限らない（特にcut_edge）。
+根の具体的な選択に依存せず、現在の成分の根として利用する。
 
 【内部実装用】
-private Node/nodes/is_root/push_up/toggle/push_down/rotate/splay/access/
-make_root/get_kth_internal。公開splitはパス問い合わせの入口。
+整数添字のSplay型LCT。値付き辺に1ノード、順逆の値と集約を保持。
+経路反転時は順逆を交換し、辺のbackwardフラグで基準方向との差を追跡。
+頂点値は交換せず、同じ値を両方向に使う。辺メタデータと頂点番号を分離。
+通常linkの辺は辺ノードなしで直接接続し、IDと端点だけを保持する。
+初めてset_edgeした時に辺ノードを追加し、同じID・基準方向・木の根を維持する。
+未展開辺がある場合のkth_edgeは隣接する2つのkth_vertexから辺IDを求める。
+Splayの作業スタックを再利用し、kth探索も反復処理。深い木でも再帰しない。
 
 【依存関係】
-tmp.cpp の標準ヘッダー・using・型／マクロ。追加の外部ライブラリなし。
+hppは必要な標準ヘッダーを自身でinclude。外部ライブラリなし。
 
 【使用例（C++20）】
 --- C++20 ここから ---
-#include "mylib/LinkCutTree.hpp"
-ll op(ll a,ll b){ return a+b; }
-ll e(){ return 0; }
-void solve(){
-    LinkCutTree<ll,op,e> tree(3);
-    rep(i,3) tree.set(i,i+1);
-    tree.link(0,1); tree.link(1,2);
-    tree.split(0,2);
-    assert(tree.get_prod(2) == 6 && tree.get_sz(2) == 3);
-    tree.split(0,2);
-    assert(tree.get_kth(2,1) == 1);
-    tree.cut(1,2);
-    cout << tree.is_connected(0,2) << '\n'; // 0
+#include "LinkCutTree.hpp"
+#include <cassert>
+using ll = long long;
+ll sum(ll a,ll b){return a+b;} ll zero(){return 0;}
+
+// 1. 頂点和
+void vertex_sum(){
+    LinkCutTree<ll,sum,zero> t(3);
+    t.set(0,1); t.set(1,2); t.set(2,3);
+    t.link(0,1); t.link(1,2);
+    assert(t.prod(0,2)==6);
+}
+// アフィン合成。係数0でもよい。ACL modintを使っても同じ定義。
+constexpr ll mod=998244353;
+struct Aff {ll a,b;};
+Aff compose(Aff l,Aff r){return {r.a*l.a%mod,(r.a*l.b+r.b)%mod};}
+Aff identity(){return {1,0};}
+// 2. 頂点の非可換モノイド
+void vertex_affine(){
+    LinkCutTree<Aff,compose,identity> t(2);
+    t.set(0,{2,1}); t.set(1,{3,4}); t.link(0,1);
+    auto f=t.prod(0,1); assert(f.a==6 && f.b==7);
+}
+// 3. 通常の辺重み
+void edge_sum(){
+    LinkCutTree<ll,sum,zero> t(3);
+    t.link_edge(0,1,5,5); t.link(1,2);
+    t.set_edge(1,2,7,7); assert(t.prod(0,2)==12);
+}
+// 4. 方向付き辺のアフィン合成
+void edge_affine(){
+    LinkCutTree<Aff,compose,identity> t(3);
+    t.link_edge(0,1,{2,1},{0,5}); t.link_edge(1,2,{3,4},{7,8});
+    auto f=t.try_prod(0,2); assert(f && f->a==6 && f->b==7);
+    t.cut(1,2); assert(!t.try_prod(0,2));
+}
+// 5. 頂点と辺を同時に集約
+void mixed(){
+    LinkCutTree<Aff,compose,identity> t(2);
+    t.set(0,{2,1}); t.set(1,{5,6});
+    t.link_edge(0,1,{3,4},{0,7});
+    auto f=t.prod(0,1); assert(f.a==30 && f.b==41);
+}
+// 6. 逆順の端点指定でも基準方向を維持
+void direction(){
+    LinkCutTree<ll,sum,zero> t(6);
+    int id=t.link_edge(2,5,10,20);
+    t.set_edge(5,2,30,40);
+    assert((t.get_edge(id)==std::pair<ll,ll>{40,30}));
+    t.set_edge(id,50,60);
+    assert(t.prod(2,5)==50 && t.prod(5,2)==60);
 }
 --- C++20 ここまで ---
